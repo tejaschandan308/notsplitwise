@@ -43,3 +43,15 @@ export interface ParseStat {
   fieldsChanged: string[];
   createdAt: number;
 }
+
+export type ParsedExpenseFields = Pick<
+  Expense,
+  | "amount"
+  | "category"
+  | "note"
+  | "location"
+  | "included"
+  | "splitType"
+  | "isPersonal"
+  | "confidence"
+>;
