@@ -70,6 +70,49 @@ export async function setActiveTrip(tripId: string): Promise<void> {
   });
 }
 
+export async function addTripMember(
+  tripId: string,
+  name: string,
+): Promise<Trip> {
+  const db = getDb();
+  const memberName = name.trim();
+
+  if (!memberName || memberName.toLowerCase() === "me") {
+    const trip = await db.trips.get(tripId);
+
+    if (!trip) {
+      throw new Error(`Trip not found: ${tripId}`);
+    }
+
+    return trip;
+  }
+
+  return db.transaction("rw", db.trips, async () => {
+    const trip = await db.trips.get(tripId);
+
+    if (!trip) {
+      throw new Error(`Trip not found: ${tripId}`);
+    }
+
+    const alreadyExists = trip.members.some(
+      (member) => member.toLowerCase() === memberName.toLowerCase(),
+    );
+
+    if (alreadyExists) {
+      return trip;
+    }
+
+    const updatedTrip: Trip = {
+      ...trip,
+      members: [...trip.members, memberName],
+    };
+
+    await db.trips.put(updatedTrip);
+
+    return updatedTrip;
+  });
+}
+
 export async function addDraftExpense(
   tripId: string,
   rawText: string,
