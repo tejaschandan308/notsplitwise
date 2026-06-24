@@ -25,14 +25,25 @@ AMOUNT
 
 PEOPLE (included)
 - "included" MUST be a subset of the provided member list, using the EXACT
-  spellings from that list. Never invent names not in the list.
-- Match casual/lowercase/partial references ("aman" -> "Aman", "me"/"I" -> "Me").
-- If the text names who it's for, include exactly those people.
+  spellings from that list. Never invent names that are not in the list.
+- Match casual, lowercase, or partial references to the closest member name
+  ("aman" -> "Aman", "me"/"I"/"myself" -> "Me").
+- Names may be joined by ANY of these connectors, and ALL named people must be
+  included: "+", "&", "and", "with", "/", commas, or just spaces between names.
+  Examples (members ["Me","Aman","Neha","Rohan"]):
+    "me + Aman"            -> ["Me","Aman"]
+    "me and aman"          -> ["Me","Aman"]
+    "me, aman, neha"       -> ["Me","Aman","Neha"]
+    "aman & neha"          -> ["Aman","Neha"]
+    "me with aman and neha"-> ["Me","Aman","Neha"]
 - Handle exclusions: "not Rohan" / "except Rohan" / "everyone but Rohan" ->
-  all members minus Rohan.
-- If NO people are mentioned, default "included" to ALL trip members (most
-  expenses are shared by the whole group).
-- "everyone" / "all of us" / "the group" -> all members.
+  all members minus Rohan. Exclusions override inclusions.
+- "everyone" / "all of us" / "the group" / "all" -> all members.
+- If NO people are mentioned at all, default "included" to ALL trip members
+  (most expenses are shared by the whole group).
+- If a named person cannot be matched to any member in the list, do NOT guess a
+  different member and do NOT silently drop them: include all the people you COULD
+  match, and set "confidence": "low". (Do not invent names; just lower confidence.)
 
 NOTE
 - A short, clean description of what it was for ("airport lunch", "hotel night 1").
