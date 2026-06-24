@@ -53,8 +53,14 @@ function displayTitle(expense: Expense): string {
   return expense.note.trim() || expense.rawText;
 }
 
-function ConfidenceFlag({ expense }: { expense: Expense }) {
-  if (expense.confidence !== "low") {
+function ConfidenceFlag({
+  expense,
+  show,
+}: {
+  expense: Expense;
+  show: boolean;
+}) {
+  if (!show || expense.confidence !== "low") {
     return null;
   }
 
@@ -364,7 +370,10 @@ export default function InboxPage() {
                     ) : null}
 
                     <div className="mt-3 flex flex-wrap items-center gap-3">
-                      <ConfidenceFlag expense={expense} />
+                      <ConfidenceFlag
+                        expense={expense}
+                        show={currentTab === "draft"}
+                      />
                       <ParseState expense={expense} />
                     </div>
                   </button>

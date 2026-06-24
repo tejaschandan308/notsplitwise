@@ -302,7 +302,10 @@ export default function ReviewPage() {
       splitType,
     };
 
-    await updateExpense(expense.id, finalValues);
+    await updateExpense(expense.id, {
+      ...finalValues,
+      confidence: "high",
+    });
 
     if (originalParseStatus.current === "done" && originalSnapshot.current) {
       const fieldsChanged = buildChangedFields(
