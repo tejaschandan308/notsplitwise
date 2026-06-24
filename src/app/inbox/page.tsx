@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/app/app-shell";
+import { buildExportText } from "@/lib/export";
 import { reparsePendingDrafts } from "@/lib/reparse";
 import {
   deleteExpense,
   getActiveTrip,
   listExpenses,
+  setExpenseStatus,
   updateExpense,
 } from "@/lib/storage";
 import type { Expense, ExpenseStatus, Trip } from "@/lib/types";
@@ -99,10 +101,26 @@ export default function InboxPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">(
+    "idle",
+  );
+  const [isArchiving, setIsArchiving] = useState(false);
 
   const visibleExpenses = currentTab === "draft" ? drafts : ready;
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selectedReadyExpenses = useMemo(
+    () => ready.filter((expense) => selectedSet.has(expense.id)),
+    [ready, selectedSet],
+  );
+  const exportText = useMemo(() => {
+    if (!activeTrip || selectedReadyExpenses.length === 0) {
+      return "";
+    }
+
+    return buildExportText(activeTrip.name, selectedReadyExpenses);
+  }, [activeTrip, selectedReadyExpenses]);
 
   async function refreshLists(tripId = activeTrip?.id): Promise<void> {
     if (!tripId) {
@@ -182,6 +200,8 @@ export default function InboxPage() {
     if (currentTab !== "ready") {
       setSelectMode(false);
       setSelectedIds([]);
+      setIsExportOpen(false);
+      setCopyStatus("idle");
     }
   }, [currentTab]);
 
@@ -222,8 +242,50 @@ export default function InboxPage() {
   }
 
   function handleExport(): void {
-    console.log("Export selected expense ids", selectedIds);
-    setNotice(`Export coming soon for ${selectedIds.length} item(s).`);
+    if (selectedReadyExpenses.length === 0) {
+      return;
+    }
+
+    setNotice("");
+    setCopyStatus("idle");
+    setIsExportOpen(true);
+  }
+
+  async function handleCopyExport(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(exportText);
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("error");
+    }
+  }
+
+  function closeExportOverlay(clearSelection = false): void {
+    setIsExportOpen(false);
+    setCopyStatus("idle");
+
+    if (clearSelection) {
+      setSelectedIds([]);
+      setSelectMode(false);
+    }
+  }
+
+  async function handleArchiveExported(): Promise<void> {
+    setIsArchiving(true);
+
+    await Promise.all(
+      selectedReadyExpenses.map((expense) =>
+        setExpenseStatus(expense.id, "archived"),
+      ),
+    );
+
+    setIsArchiving(false);
+    closeExportOverlay(true);
+    await refreshLists();
+  }
+
+  function handleKeepExported(): void {
+    closeExportOverlay(true);
   }
 
   function openReview(expense: Expense): void {
@@ -403,6 +465,95 @@ export default function InboxPage() {
           </div>
         )}
       </section>
+
+      {isExportOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/35 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8">
+          <div
+            className="max-h-[90dvh] w-full rounded-t-2xl bg-background p-4 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="export-title"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 id="export-title" className="text-xl font-semibold">
+                  Export {selectedReadyExpenses.length}{" "}
+                  {selectedReadyExpenses.length === 1
+                    ? "expense"
+                    : "expenses"}
+                </h2>
+                <p className="mt-1 text-sm text-foreground/60">
+                  Copy this into Splitwise when you are ready.
+                </p>
+              </div>
+              <button
+                className="min-h-10 px-3 text-sm text-foreground/65"
+                type="button"
+                onClick={() => closeExportOverlay()}
+              >
+                Close
+              </button>
+            </div>
+
+            <textarea
+              className="mt-4 h-64 w-full resize-none rounded-lg border border-foreground/15 bg-foreground/5 p-3 font-mono text-sm leading-6 text-foreground"
+              readOnly
+              value={exportText}
+            />
+
+            {copyStatus === "copied" ? (
+              <p className="mt-3 text-sm font-medium text-green-700">
+                Copied!
+              </p>
+            ) : null}
+
+            {copyStatus === "error" ? (
+              <p className="mt-3 text-sm text-foreground/65">
+                Couldn&apos;t copy automatically — select the text above and copy manually.
+              </p>
+            ) : null}
+
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                className="min-h-11 bg-foreground px-4 text-sm font-medium text-background"
+                type="button"
+                onClick={handleCopyExport}
+              >
+                Copy to clipboard
+              </button>
+
+              {copyStatus === "copied" ? (
+                <div className="rounded-lg border border-foreground/10 p-3">
+                  <p className="text-sm font-medium">
+                    Archive these {selectedReadyExpenses.length}{" "}
+                    {selectedReadyExpenses.length === 1
+                      ? "expense"
+                      : "expenses"}
+                    ?
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      className="min-h-10 bg-foreground px-3 text-sm font-medium text-background disabled:opacity-60"
+                      disabled={isArchiving}
+                      type="button"
+                      onClick={handleArchiveExported}
+                    >
+                      {isArchiving ? "Archiving..." : "Archive"}
+                    </button>
+                    <button
+                      className="min-h-10 px-3 text-sm"
+                      type="button"
+                      onClick={handleKeepExported}
+                    >
+                      Keep
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </AppShell>
   );
 }
