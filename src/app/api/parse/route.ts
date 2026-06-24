@@ -31,6 +31,7 @@ function buildFallback(rawText: string, members: string[]): ParsedExpenseFields 
     note: rawText.trim(),
     location: null,
     included: [...members],
+    unmatchedNames: [],
     splitType: "equal",
     isPersonal: false,
     confidence: "low",
@@ -77,6 +78,37 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function sanitizeUnmatchedNames(
+  value: unknown,
+  members: string[],
+): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const memberNames = new Set(members.map((member) => member.toLowerCase()));
+  const seen = new Set<string>();
+  const unmatchedNames: string[] = [];
+
+  for (const item of value) {
+    if (typeof item !== "string") {
+      continue;
+    }
+
+    const name = item.trim();
+    const key = name.toLowerCase();
+
+    if (!name || memberNames.has(key) || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    unmatchedNames.push(name);
+  }
+
+  return unmatchedNames;
+}
+
 function sanitizeParsed(
   parsed: unknown,
   members: string[],
@@ -111,6 +143,7 @@ function sanitizeParsed(
         : included.length > 0
           ? included
           : [...members],
+    unmatchedNames: sanitizeUnmatchedNames(record.unmatchedNames, members),
     splitType: "equal",
     isPersonal,
     confidence:

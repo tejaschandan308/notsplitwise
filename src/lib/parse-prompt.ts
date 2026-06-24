@@ -13,6 +13,7 @@ exactly these keys:
   "note": string,
   "location": string | null,
   "included": string[],
+  "unmatchedNames": string[],
   "splitType": "equal",
   "isPersonal": boolean,
   "confidence": "high" | "low"
@@ -41,9 +42,14 @@ PEOPLE (included)
 - "everyone" / "all of us" / "the group" / "all" -> all members.
 - If NO people are mentioned at all, default "included" to ALL trip members
   (most expenses are shared by the whole group).
-- If a named person cannot be matched to any member in the list, do NOT guess a
-  different member and do NOT silently drop them: include all the people you COULD
-  match, and set "confidence": "low". (Do not invent names; just lower confidence.)
+- If the text mentions a person-name that does NOT match any member in the list,
+  do NOT guess a different member and do NOT put them in "included". Instead add
+  the name (as the user wrote it) to "unmatchedNames", and set "confidence":
+  "low".
+- "unmatchedNames" lists ONLY genuine person-names that were mentioned but are
+  not in the member list. It MUST be [] when every mentioned person matched, or
+  when no people were mentioned. Never put places, items, or non-name words in
+  it (e.g. "airport", "lunch" are NOT names).
 
 NOTE
 - A short, clean description of what it was for ("airport lunch", "hotel night 1").
@@ -75,5 +81,5 @@ CONFIDENCE
   garbled. When in doubt, use "low".
 
 If the input is nonsense/unparseable: amount null, category null, note = the
-trimmed raw text, location null, included = all members, splitType "equal",
-isPersonal false, confidence "low".`;
+trimmed raw text, location null, included = all members, unmatchedNames = [],
+splitType "equal", isPersonal false, confidence "low".`;

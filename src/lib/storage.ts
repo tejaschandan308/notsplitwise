@@ -91,6 +91,7 @@ export async function addDraftExpense(
     note: "",
     location: null,
     included: [...trip.members],
+    unmatchedNames: [],
     splitType: "equal",
     isPersonal: false,
     confidence: "low",

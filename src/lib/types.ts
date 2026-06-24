@@ -28,6 +28,7 @@ export interface Expense {
   note: string;
   location: string | null;
   included: string[];
+  unmatchedNames: string[];
   splitType: SplitType;
   isPersonal: boolean;
   confidence: Confidence;
@@ -51,6 +52,7 @@ export type ParsedExpenseFields = Pick<
   | "note"
   | "location"
   | "included"
+  | "unmatchedNames"
   | "splitType"
   | "isPersonal"
   | "confidence"
