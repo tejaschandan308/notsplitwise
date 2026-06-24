@@ -5,18 +5,30 @@ function createId(): string {
   return crypto.randomUUID();
 }
 
+function toTitleCase(name: string): string {
+  return name
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((word) =>
+      word ? word[0].toUpperCase() + word.slice(1).toLowerCase() : "",
+    )
+    .join(" ");
+}
+
 function cleanMembers(otherMembers: string[]): string[] {
-  const seen = new Set(["Me"]);
+  const seen = new Set(["me"]);
   const members = ["Me"];
 
   for (const member of otherMembers) {
-    const name = member.trim();
+    const name = toTitleCase(member);
+    const key = name.toLowerCase();
 
-    if (!name || seen.has(name)) {
+    if (!name || key === "me" || seen.has(key)) {
       continue;
     }
 
-    seen.add(name);
+    seen.add(key);
     members.push(name);
   }
 
@@ -75,7 +87,7 @@ export async function addTripMember(
   name: string,
 ): Promise<Trip> {
   const db = getDb();
-  const memberName = name.trim();
+  const memberName = toTitleCase(name);
 
   if (!memberName || memberName.toLowerCase() === "me") {
     const trip = await db.trips.get(tripId);
