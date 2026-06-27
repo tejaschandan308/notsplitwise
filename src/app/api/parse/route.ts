@@ -34,24 +34,41 @@ function sanitizeLockedIncluded(value: string[], members: string[]): string[] {
   return members.includes("Me") ? ["Me"] : [...members];
 }
 
-function buildFallback(
-  rawText: string,
-  members: string[],
-  lockedIncluded?: string[],
-): ParsedExpenseFields {
+function buildFallback(rawText: string, members: string[]): ParsedExpenseFields {
   return {
     amount: null,
     category: null,
     note: rawText.trim(),
     location: null,
-    included: lockedIncluded
-      ? sanitizeLockedIncluded(lockedIncluded, members)
-      : [...members],
+    included: [...members],
     unmatchedNames: [],
     splitType: "equal",
     isPersonal: false,
     confidence: "low",
   };
+}
+
+function enforcePeopleLock(
+  data: ParsedExpenseFields,
+  members: string[],
+  peopleLocked: boolean,
+  lockedIncluded: string[],
+): ParsedExpenseFields {
+  const finalData = peopleLocked
+    ? {
+        ...data,
+        included: sanitizeLockedIncluded(lockedIncluded, members),
+        unmatchedNames: [],
+      }
+    : data;
+
+  console.log("PARSE", {
+    peopleLocked,
+    lockedIncluded,
+    finalIncluded: finalData.included,
+  });
+
+  return finalData;
 }
 
 function jsonResponse(response: ParseResponse): NextResponse<ParseResponse> {
@@ -129,7 +146,6 @@ function sanitizeParsed(
   parsed: unknown,
   members: string[],
   fallback: ParsedExpenseFields,
-  lockedIncluded?: string[],
 ): ParsedExpenseFields {
   const record = asRecord(parsed);
   const amount = record.amount;
@@ -140,9 +156,6 @@ function sanitizeParsed(
     ? members.filter((member) => parsedIncluded.includes(member))
     : [];
   const isPersonal = Boolean(record.isPersonal);
-  const committedIncluded = lockedIncluded
-    ? sanitizeLockedIncluded(lockedIncluded, members)
-    : null;
 
   return {
     amount: typeof amount === "number" && Number.isFinite(amount) ? amount : null,
@@ -160,14 +173,10 @@ function sanitizeParsed(
     included:
       isPersonal && members.includes("Me")
         ? ["Me"]
-        : committedIncluded
-          ? committedIncluded
-          : included.length > 0
-            ? included
-            : [...members],
-    unmatchedNames: committedIncluded
-      ? []
-      : sanitizeUnmatchedNames(record.unmatchedNames, members),
+        : included.length > 0
+          ? included
+          : [...members],
+    unmatchedNames: sanitizeUnmatchedNames(record.unmatchedNames, members),
     splitType: "equal",
     isPersonal,
     confidence:
@@ -209,16 +218,17 @@ export async function POST(request: Request) {
         )
       : [];
 
-    const fallback = buildFallback(
-      rawText,
-      members,
-      peopleLocked ? lockedIncluded : undefined,
-    );
+    const fallback = buildFallback(rawText, members);
 
     if (!rawText.trim() || members.length === 0) {
       return jsonResponse({
         ok: false,
-        data: fallback,
+        data: enforcePeopleLock(
+          fallback,
+          members,
+          peopleLocked,
+          lockedIncluded,
+        ),
         error: "invalid input",
       });
     }
@@ -226,7 +236,12 @@ export async function POST(request: Request) {
     if (!process.env.ANTHROPIC_API_KEY) {
       return jsonResponse({
         ok: false,
-        data: fallback,
+        data: enforcePeopleLock(
+          fallback,
+          members,
+          peopleLocked,
+          lockedIncluded,
+        ),
         error: "missing ANTHROPIC_API_KEY",
       });
     }
@@ -250,30 +265,37 @@ export async function POST(request: Request) {
 
     try {
       const parsed = parseJsonObject(text);
+      const data = sanitizeParsed(parsed, members, fallback);
 
       return jsonResponse({
         ok: true,
-        data: sanitizeParsed(
-          parsed,
+        data: enforcePeopleLock(
+          data,
           members,
-          fallback,
-          peopleLocked ? lockedIncluded : undefined,
+          peopleLocked,
+          lockedIncluded,
         ),
       });
     } catch {
       return jsonResponse({
         ok: false,
-        data: fallback,
+        data: enforcePeopleLock(
+          fallback,
+          members,
+          peopleLocked,
+          lockedIncluded,
+        ),
         error: "json parse failed",
       });
     }
   } catch (err) {
     return jsonResponse({
       ok: false,
-      data: buildFallback(
-        rawText,
+      data: enforcePeopleLock(
+        buildFallback(rawText, members),
         members,
-        peopleLocked ? lockedIncluded : undefined,
+        peopleLocked,
+        lockedIncluded,
       ),
       error: String(err),
     });

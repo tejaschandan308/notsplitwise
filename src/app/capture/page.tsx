@@ -37,6 +37,19 @@ function shouldShowMicHint(): boolean {
   );
 }
 
+function resolveLockedSelection(
+  selection: string[],
+  members: string[],
+): string[] {
+  const included = members.filter((member) => selection.includes(member));
+
+  if (included.length > 0) {
+    return included;
+  }
+
+  return members.includes("Me") ? ["Me"] : [...members];
+}
+
 async function parseDraftInBackground(
   draft: Expense,
   rawText: string,
@@ -75,6 +88,8 @@ async function parseDraftInBackground(
 export default function CapturePage() {
   const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const pillsTouchedRef = useRef(false);
+  const selectedMembersRef = useRef<string[]>([]);
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
   const [rawText, setRawText] = useState("");
   const [draftCount, setDraftCount] = useState(0);
@@ -106,6 +121,7 @@ export default function CapturePage() {
 
       if (!ignore) {
         setActiveTrip(trip);
+        selectedMembersRef.current = trip.members;
         setSelectedMembers(trip.members);
         setDraftCount(drafts.length);
         setShowHint(shouldShowMicHint());
@@ -145,16 +161,17 @@ export default function CapturePage() {
   }
 
   function toggleMember(member: string): void {
-    const baseSelection = pillsTouched
-      ? selectedMembers
+    const baseSelection = pillsTouchedRef.current
+      ? selectedMembersRef.current
       : activeTrip?.members ?? [];
+    const nextSelection = baseSelection.includes(member)
+      ? baseSelection.filter((name) => name !== member)
+      : [...baseSelection, member];
 
+    pillsTouchedRef.current = true;
+    selectedMembersRef.current = nextSelection;
     setPillsTouched(true);
-    setSelectedMembers(
-      baseSelection.includes(member)
-        ? baseSelection.filter((name) => name !== member)
-        : [...baseSelection, member],
-    );
+    setSelectedMembers(nextSelection);
   }
 
   function toggleAllMembers(): void {
@@ -163,15 +180,16 @@ export default function CapturePage() {
     }
 
     const allSelected = activeTrip.members.every((member) =>
-      selectedMembers.includes(member),
+      selectedMembersRef.current.includes(member),
     );
+    const nextSelection = allSelected
+      ? activeTrip.members.filter((member) => member === "Me")
+      : activeTrip.members;
 
+    pillsTouchedRef.current = true;
+    selectedMembersRef.current = nextSelection;
     setPillsTouched(true);
-    setSelectedMembers(
-      allSelected
-        ? activeTrip.members.filter((member) => member === "Me")
-        : activeTrip.members,
-    );
+    setSelectedMembers(nextSelection);
   }
 
   async function handleSave(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -183,8 +201,17 @@ export default function CapturePage() {
       return;
     }
 
-    const peopleLocked = pillsTouched;
-    const lockedIncluded = [...selectedMembers];
+    const latestPillsTouched = pillsTouchedRef.current;
+    const selection = [...selectedMembersRef.current];
+    const peopleLockedSent = latestPillsTouched;
+    const lockedIncludedSent = peopleLockedSent ? selection : [];
+
+    console.log("SAVE", {
+      pillsTouched: latestPillsTouched,
+      selection,
+      peopleLockedSent,
+      lockedIncludedSent,
+    });
 
     setIsSaving(true);
     setError("");
@@ -192,7 +219,16 @@ export default function CapturePage() {
     try {
       const draft = await addDraftExpense(activeTrip.id, capture);
 
+      if (peopleLockedSent) {
+        await updateExpense(draft.id, {
+          included: resolveLockedSelection(selection, activeTrip.members),
+          unmatchedNames: [],
+        });
+      }
+
       setRawText("");
+      pillsTouchedRef.current = false;
+      selectedMembersRef.current = activeTrip.members;
       setPillsTouched(false);
       setSelectedMembers(activeTrip.members);
       setSaveMessage("Saved");
@@ -205,8 +241,8 @@ export default function CapturePage() {
         draft,
         capture,
         activeTrip.members,
-        peopleLocked,
-        lockedIncluded,
+        peopleLockedSent,
+        lockedIncludedSent,
       ).catch(() => undefined);
       window.setTimeout(() => setSaveMessage(""), 1200);
     } catch (err) {
