@@ -41,6 +41,8 @@ async function parseDraftInBackground(
   draft: Expense,
   rawText: string,
   members: string[],
+  peopleLocked: boolean,
+  lockedIncluded: string[],
 ): Promise<void> {
   try {
     const response = await fetch("/api/parse", {
@@ -48,7 +50,11 @@ async function parseDraftInBackground(
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ rawText, members }),
+      body: JSON.stringify({
+        rawText,
+        members,
+        ...(peopleLocked ? { peopleLocked, lockedIncluded } : {}),
+      }),
     });
     const result = (await response.json()) as ParseResponse;
 
@@ -77,6 +83,8 @@ export default function CapturePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [error, setError] = useState("");
+  const [pillsTouched, setPillsTouched] = useState(false);
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
 
   async function refreshDraftCount(tripId: string): Promise<void> {
     const drafts = await listExpenses(tripId, "draft");
@@ -98,6 +106,7 @@ export default function CapturePage() {
 
       if (!ignore) {
         setActiveTrip(trip);
+        setSelectedMembers(trip.members);
         setDraftCount(drafts.length);
         setShowHint(shouldShowMicHint());
         setIsLoading(false);
@@ -135,6 +144,36 @@ export default function CapturePage() {
     void requestPersistentStorage().catch(() => undefined);
   }
 
+  function toggleMember(member: string): void {
+    const baseSelection = pillsTouched
+      ? selectedMembers
+      : activeTrip?.members ?? [];
+
+    setPillsTouched(true);
+    setSelectedMembers(
+      baseSelection.includes(member)
+        ? baseSelection.filter((name) => name !== member)
+        : [...baseSelection, member],
+    );
+  }
+
+  function toggleAllMembers(): void {
+    if (!activeTrip) {
+      return;
+    }
+
+    const allSelected = activeTrip.members.every((member) =>
+      selectedMembers.includes(member),
+    );
+
+    setPillsTouched(true);
+    setSelectedMembers(
+      allSelected
+        ? activeTrip.members.filter((member) => member === "Me")
+        : activeTrip.members,
+    );
+  }
+
   async function handleSave(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
@@ -144,6 +183,9 @@ export default function CapturePage() {
       return;
     }
 
+    const peopleLocked = pillsTouched;
+    const lockedIncluded = [...selectedMembers];
+
     setIsSaving(true);
     setError("");
 
@@ -151,15 +193,21 @@ export default function CapturePage() {
       const draft = await addDraftExpense(activeTrip.id, capture);
 
       setRawText("");
+      setPillsTouched(false);
+      setSelectedMembers(activeTrip.members);
       setSaveMessage("Saved");
       retireHintAfterSave();
       requestPersistenceOnce();
       await refreshDraftCount(activeTrip.id);
       inputRef.current?.focus();
 
-      void parseDraftInBackground(draft, capture, activeTrip.members).catch(
-        () => undefined,
-      );
+      void parseDraftInBackground(
+        draft,
+        capture,
+        activeTrip.members,
+        peopleLocked,
+        lockedIncluded,
+      ).catch(() => undefined);
       window.setTimeout(() => setSaveMessage(""), 1200);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save capture.");
@@ -217,6 +265,58 @@ export default function CapturePage() {
                 setError("");
               }}
             />
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">People</p>
+                <button
+                  className="min-h-11 px-2 text-sm font-medium text-foreground/70"
+                  type="button"
+                  onClick={toggleAllMembers}
+                >
+                  {activeTrip.members.every((member) =>
+                    selectedMembers.includes(member),
+                  )
+                    ? "Clear"
+                    : "Everyone"}
+                </button>
+              </div>
+              <div
+                aria-label="People included"
+                className="flex flex-wrap gap-2"
+              >
+                {activeTrip.members.map((member) => {
+                  const isSelected = selectedMembers.includes(member);
+
+                  return (
+                    <button
+                      key={member}
+                      aria-pressed={pillsTouched ? isSelected : undefined}
+                      className={`min-h-11 rounded-full border px-4 text-sm font-medium ${
+                        !pillsTouched
+                          ? "border-foreground/20 bg-transparent text-foreground/50"
+                          : isSelected
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-foreground/25 bg-transparent text-foreground/70"
+                      }`}
+                      type="button"
+                      onClick={() => toggleMember(member)}
+                    >
+                      {pillsTouched && isSelected ? (
+                        <span aria-hidden="true" className="mr-1">
+                          {"\u2713"}
+                        </span>
+                      ) : null}
+                      {member}
+                    </button>
+                  );
+                })}
+              </div>
+              {!pillsTouched ? (
+                <p className="text-xs text-foreground/55">
+                  Defaults to everyone, or uses people named in your text.
+                </p>
+              ) : null}
+            </div>
             <button
               className="min-h-12 rounded-md bg-foreground px-4 text-base font-semibold text-background disabled:cursor-not-allowed disabled:opacity-45"
               disabled={!rawText.trim() || isSaving}

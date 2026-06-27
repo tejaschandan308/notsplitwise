@@ -25,6 +25,8 @@ AMOUNT
 - If no amount is clearly present, set "amount": null. NEVER guess a number.
 
 PEOPLE (included)
+- People may be supplied and locked externally. These rules apply when they are
+  not locked by the app.
 - "included" MUST be a subset of the provided member list, using the EXACT
   spellings from that list. Never invent names that are not in the list.
 - Match casual, lowercase, or partial references to the closest member name

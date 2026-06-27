@@ -24,13 +24,29 @@ const allowedCategories = new Set<Category>([
   "other",
 ]);
 
-function buildFallback(rawText: string, members: string[]): ParsedExpenseFields {
+function sanitizeLockedIncluded(value: string[], members: string[]): string[] {
+  const included = members.filter((member) => value.includes(member));
+
+  if (included.length > 0) {
+    return included;
+  }
+
+  return members.includes("Me") ? ["Me"] : [...members];
+}
+
+function buildFallback(
+  rawText: string,
+  members: string[],
+  lockedIncluded?: string[],
+): ParsedExpenseFields {
   return {
     amount: null,
     category: null,
     note: rawText.trim(),
     location: null,
-    included: [...members],
+    included: lockedIncluded
+      ? sanitizeLockedIncluded(lockedIncluded, members)
+      : [...members],
     unmatchedNames: [],
     splitType: "equal",
     isPersonal: false,
@@ -113,6 +129,7 @@ function sanitizeParsed(
   parsed: unknown,
   members: string[],
   fallback: ParsedExpenseFields,
+  lockedIncluded?: string[],
 ): ParsedExpenseFields {
   const record = asRecord(parsed);
   const amount = record.amount;
@@ -123,6 +140,9 @@ function sanitizeParsed(
     ? members.filter((member) => parsedIncluded.includes(member))
     : [];
   const isPersonal = Boolean(record.isPersonal);
+  const committedIncluded = lockedIncluded
+    ? sanitizeLockedIncluded(lockedIncluded, members)
+    : null;
 
   return {
     amount: typeof amount === "number" && Number.isFinite(amount) ? amount : null,
@@ -140,10 +160,14 @@ function sanitizeParsed(
     included:
       isPersonal && members.includes("Me")
         ? ["Me"]
-        : included.length > 0
-          ? included
-          : [...members],
-    unmatchedNames: sanitizeUnmatchedNames(record.unmatchedNames, members),
+        : committedIncluded
+          ? committedIncluded
+          : included.length > 0
+            ? included
+            : [...members],
+    unmatchedNames: committedIncluded
+      ? []
+      : sanitizeUnmatchedNames(record.unmatchedNames, members),
     splitType: "equal",
     isPersonal,
     confidence:
@@ -163,19 +187,33 @@ function extractTextBlocks(content: Anthropic.Messages.Message["content"]) {
 export async function POST(request: Request) {
   let rawText = "";
   let members: string[] = [];
+  let peopleLocked = false;
+  let lockedIncluded: string[] = [];
 
   try {
     const body = (await request.json()) as {
       rawText?: unknown;
       members?: unknown;
+      peopleLocked?: unknown;
+      lockedIncluded?: unknown;
     };
 
     rawText = typeof body.rawText === "string" ? body.rawText : "";
     members = Array.isArray(body.members)
       ? body.members.filter((member): member is string => typeof member === "string")
       : [];
+    peopleLocked = body.peopleLocked === true;
+    lockedIncluded = Array.isArray(body.lockedIncluded)
+      ? body.lockedIncluded.filter(
+          (member): member is string => typeof member === "string",
+        )
+      : [];
 
-    const fallback = buildFallback(rawText, members);
+    const fallback = buildFallback(
+      rawText,
+      members,
+      peopleLocked ? lockedIncluded : undefined,
+    );
 
     if (!rawText.trim() || members.length === 0) {
       return jsonResponse({
@@ -215,7 +253,12 @@ export async function POST(request: Request) {
 
       return jsonResponse({
         ok: true,
-        data: sanitizeParsed(parsed, members, fallback),
+        data: sanitizeParsed(
+          parsed,
+          members,
+          fallback,
+          peopleLocked ? lockedIncluded : undefined,
+        ),
       });
     } catch {
       return jsonResponse({
@@ -227,7 +270,11 @@ export async function POST(request: Request) {
   } catch (err) {
     return jsonResponse({
       ok: false,
-      data: buildFallback(rawText, members),
+      data: buildFallback(
+        rawText,
+        members,
+        peopleLocked ? lockedIncluded : undefined,
+      ),
       error: String(err),
     });
   }
