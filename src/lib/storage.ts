@@ -128,6 +128,10 @@ export async function addTripMember(
 export async function addDraftExpense(
   tripId: string,
   rawText: string,
+  options?: {
+    included?: string[];
+    peopleLocked?: boolean;
+  },
 ): Promise<Expense> {
   const db = getDb();
   const trip = await db.trips.get(tripId);
@@ -145,7 +149,10 @@ export async function addDraftExpense(
     category: null,
     note: "",
     location: null,
-    included: [...trip.members],
+    included: options?.included
+      ? [...options.included]
+      : [...trip.members],
+    ...(options?.peopleLocked ? { peopleLocked: true } : {}),
     unmatchedNames: [],
     splitType: "equal",
     isPersonal: false,
@@ -159,6 +166,10 @@ export async function addDraftExpense(
   await db.expenses.add(expense);
 
   return expense;
+}
+
+export async function getExpense(id: string): Promise<Expense | undefined> {
+  return getDb().expenses.get(id);
 }
 
 export async function updateExpense(

@@ -8,6 +8,7 @@ import {
   addDraftExpense,
   addTripMember,
   getActiveTrip,
+  getExpense,
   listExpenses,
   requestPersistentStorage,
   updateExpense,
@@ -73,7 +74,13 @@ async function parseDraftInBackground(
     const result = (await response.json()) as ParseResponse;
 
     if (result.ok) {
-      const parsedUpdate = peopleLocked
+      const persistedDraft = await getExpense(draft.id);
+
+      if (!persistedDraft) {
+        return;
+      }
+
+      const parsedUpdate = persistedDraft.peopleLocked
         ? {
             amount: result.data.amount,
             category: result.data.category,
@@ -296,15 +303,16 @@ export default function CapturePage() {
     setError("");
 
     try {
-      const draft = await addDraftExpense(activeTrip.id, capture);
-
-      if (peopleLockedSent) {
-        // Persist the committed people before starting any network work.
-        await updateExpense(draft.id, {
-          included: resolveLockedSelection(selection, activeTrip.members),
-          unmatchedNames: [],
-        });
-      }
+      const draft = await addDraftExpense(
+        activeTrip.id,
+        capture,
+        peopleLockedSent
+          ? {
+              included: resolveLockedSelection(selection, activeTrip.members),
+              peopleLocked: true,
+            }
+          : undefined,
+      );
 
       setRawText("");
       pillsTouchedRef.current = false;
