@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AppShell } from "@/app/app-shell";
 import {
   addDraftExpense,
+  addTripMember,
   getActiveTrip,
   listExpenses,
   requestPersistentStorage,
@@ -88,6 +89,7 @@ async function parseDraftInBackground(
 export default function CapturePage() {
   const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const memberInputRef = useRef<HTMLInputElement>(null);
   const pillsTouchedRef = useRef(false);
   const selectedMembersRef = useRef<string[]>([]);
   const [activeTrip, setActiveTrip] = useState<Trip | null>(null);
@@ -100,6 +102,10 @@ export default function CapturePage() {
   const [error, setError] = useState("");
   const [pillsTouched, setPillsTouched] = useState(false);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [isMemberInputOpen, setIsMemberInputOpen] = useState(false);
+  const [memberName, setMemberName] = useState("");
+  const [memberMessage, setMemberMessage] = useState("");
+  const [isAddingMember, setIsAddingMember] = useState(false);
 
   async function refreshDraftCount(tripId: string): Promise<void> {
     const drafts = await listExpenses(tripId, "draft");
@@ -142,6 +148,12 @@ export default function CapturePage() {
     }
   }, [isLoading]);
 
+  useEffect(() => {
+    if (isMemberInputOpen) {
+      memberInputRef.current?.focus();
+    }
+  }, [isMemberInputOpen]);
+
   function retireHintAfterSave(): void {
     const nextCount = readNumber(captureCountKey) + 1;
     window.localStorage.setItem(captureCountKey, String(nextCount));
@@ -182,7 +194,8 @@ export default function CapturePage() {
     const allSelected = activeTrip.members.every((member) =>
       selectedMembersRef.current.includes(member),
     );
-    const nextSelection = allSelected
+    const shouldClear = pillsTouchedRef.current && allSelected;
+    const nextSelection = shouldClear
       ? activeTrip.members.filter((member) => member === "Me")
       : activeTrip.members;
 
@@ -190,6 +203,60 @@ export default function CapturePage() {
     selectedMembersRef.current = nextSelection;
     setPillsTouched(true);
     setSelectedMembers(nextSelection);
+  }
+
+  async function handleAddMember(
+    event: FormEvent<HTMLFormElement>,
+  ): Promise<void> {
+    event.preventDefault();
+
+    const name = memberName.trim();
+
+    if (!name) {
+      setMemberMessage("Enter a name");
+      return;
+    }
+
+    if (!activeTrip || isAddingMember) {
+      return;
+    }
+
+    setIsAddingMember(true);
+    setMemberMessage("");
+
+    try {
+      const updatedTrip = await addTripMember(activeTrip.id, name);
+
+      if (updatedTrip.members.length === activeTrip.members.length) {
+        setMemberMessage("Already added");
+        return;
+      }
+
+      const addedMembers = updatedTrip.members.filter(
+        (member) => !activeTrip.members.includes(member),
+      );
+      const nextSelection = pillsTouchedRef.current
+        ? [...selectedMembersRef.current, ...addedMembers]
+        : updatedTrip.members;
+
+      selectedMembersRef.current = nextSelection;
+      setSelectedMembers(nextSelection);
+      setActiveTrip(updatedTrip);
+      setMemberName("");
+      setMemberMessage("");
+      setIsMemberInputOpen(false);
+    } catch {
+      setMemberMessage("Could not add member");
+    } finally {
+      setIsAddingMember(false);
+    }
+  }
+
+  function closeMemberInput(): void {
+    setMemberName("");
+    setMemberMessage("");
+    setIsMemberInputOpen(false);
+    inputRef.current?.focus();
   }
 
   async function handleSave(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -272,18 +339,100 @@ export default function CapturePage() {
     return null;
   }
 
+  const allMembersSelected = activeTrip.members.every((member) =>
+    selectedMembers.includes(member),
+  );
+  const toggleAllLabel =
+    pillsTouched && allMembersSelected ? "Clear" : "Everyone";
+
   return (
     <AppShell>
       <section className="flex min-h-[calc(100dvh-8rem)] flex-col justify-between gap-8 pt-4">
         <div>
-          <button
-            className="mb-8 min-h-10 border-0 px-0 text-left text-sm font-medium text-foreground/70"
-            type="button"
-            // TODO: wire trip switching in a later phase.
-            onClick={() => undefined}
-          >
-            {activeTrip.name}
-          </button>
+          <div className="mb-8">
+            <div className="flex items-center gap-2">
+              <button
+                className="min-h-11 border-0 px-0 text-left text-sm font-medium text-foreground/70"
+                type="button"
+                // TODO: wire trip switching in a later phase.
+                onClick={() => undefined}
+              >
+                {activeTrip.name}
+              </button>
+              <button
+                aria-expanded={isMemberInputOpen}
+                aria-label="Add trip member"
+                className="flex size-11 items-center justify-center text-foreground/65"
+                title="Add trip member"
+                type="button"
+                onClick={() => {
+                  if (isMemberInputOpen) {
+                    closeMemberInput();
+                  } else {
+                    setMemberMessage("");
+                    setIsMemberInputOpen(true);
+                  }
+                }}
+              >
+                <span aria-hidden="true" className="relative h-5 w-6">
+                  <span className="absolute left-1 top-0 size-2 rounded-full border border-current" />
+                  <span className="absolute bottom-0 left-0 h-2.5 w-4 rounded-t-full border border-b-0 border-current" />
+                  <span className="absolute right-0 top-1 text-base leading-none">
+                    +
+                  </span>
+                </span>
+              </button>
+            </div>
+
+            {isMemberInputOpen ? (
+              <form
+                className="mt-2 flex flex-wrap items-start gap-2"
+                onSubmit={handleAddMember}
+              >
+                <div>
+                  <label className="sr-only" htmlFor="new-trip-member">
+                    New trip member
+                  </label>
+                  <input
+                    ref={memberInputRef}
+                    className="min-h-11 w-44 rounded-md border border-foreground/20 bg-transparent px-3 text-sm outline-none focus:border-foreground/45"
+                    id="new-trip-member"
+                    placeholder="Name"
+                    value={memberName}
+                    onChange={(event) => {
+                      setMemberName(event.target.value);
+                      setMemberMessage("");
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        event.currentTarget.form?.requestSubmit();
+                      }
+                    }}
+                  />
+                  {memberMessage ? (
+                    <p className="mt-1 text-xs text-foreground/60">
+                      {memberMessage}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  className="min-h-11 px-3 text-sm font-medium"
+                  disabled={isAddingMember}
+                  type="submit"
+                >
+                  {isAddingMember ? "Adding..." : "Add"}
+                </button>
+                <button
+                  className="min-h-11 px-3 text-sm text-foreground/65"
+                  type="button"
+                  onClick={closeMemberInput}
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : null}
+          </div>
 
           <form className="flex flex-col gap-3" onSubmit={handleSave}>
             <label className="sr-only" htmlFor="capture-text">
@@ -309,11 +458,7 @@ export default function CapturePage() {
                   type="button"
                   onClick={toggleAllMembers}
                 >
-                  {activeTrip.members.every((member) =>
-                    selectedMembers.includes(member),
-                  )
-                    ? "Clear"
-                    : "Everyone"}
+                  {toggleAllLabel}
                 </button>
               </div>
               <div
