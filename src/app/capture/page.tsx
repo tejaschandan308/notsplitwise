@@ -73,8 +73,20 @@ async function parseDraftInBackground(
     const result = (await response.json()) as ParseResponse;
 
     if (result.ok) {
+      const parsedUpdate = peopleLocked
+        ? {
+            amount: result.data.amount,
+            category: result.data.category,
+            note: result.data.note,
+            location: result.data.location,
+            splitType: result.data.splitType,
+            isPersonal: result.data.isPersonal,
+            confidence: result.data.confidence,
+          }
+        : result.data;
+
       await updateExpense(draft.id, {
-        ...result.data,
+        ...parsedUpdate,
         parseStatus: "done",
       });
       return;
@@ -287,6 +299,7 @@ export default function CapturePage() {
       const draft = await addDraftExpense(activeTrip.id, capture);
 
       if (peopleLockedSent) {
+        // Persist the committed people before starting any network work.
         await updateExpense(draft.id, {
           included: resolveLockedSelection(selection, activeTrip.members),
           unmatchedNames: [],
