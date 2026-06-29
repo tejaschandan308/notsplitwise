@@ -43,6 +43,14 @@ export async function reparsePendingDrafts(trip: Trip): Promise<void> {
         break;
       }
 
+      const peopleLocked = expense.peopleLocked === true;
+      const lockedIncluded = peopleLocked
+        ? Array.isArray(expense.lockedIncluded) &&
+          expense.lockedIncluded.length > 0
+          ? expense.lockedIncluded
+          : expense.included
+        : [];
+
       try {
         const response = await fetch("/api/parse", {
           method: "POST",
@@ -52,6 +60,8 @@ export async function reparsePendingDrafts(trip: Trip): Promise<void> {
           body: JSON.stringify({
             rawText: expense.rawText,
             members: trip.members,
+            peopleLocked,
+            lockedIncluded,
           }),
         });
         const result = (await response.json()) as ParseResponse;
@@ -59,6 +69,12 @@ export async function reparsePendingDrafts(trip: Trip): Promise<void> {
         if (result.ok) {
           await updateExpense(expense.id, {
             ...result.data,
+            ...(peopleLocked
+              ? {
+                  included: lockedIncluded,
+                  unmatchedNames: [],
+                }
+              : {}),
             parseStatus: "done",
           });
         } else {

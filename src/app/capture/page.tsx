@@ -80,15 +80,16 @@ async function parseDraftInBackground(
         return;
       }
 
+      const persistedLockedIncluded =
+        Array.isArray(persistedDraft.lockedIncluded) &&
+        persistedDraft.lockedIncluded.length > 0
+          ? persistedDraft.lockedIncluded
+          : persistedDraft.included;
       const parsedUpdate = persistedDraft.peopleLocked
         ? {
-            amount: result.data.amount,
-            category: result.data.category,
-            note: result.data.note,
-            location: result.data.location,
-            splitType: result.data.splitType,
-            isPersonal: result.data.isPersonal,
-            confidence: result.data.confidence,
+            ...result.data,
+            included: persistedLockedIncluded,
+            unmatchedNames: [],
           }
         : result.data;
 
@@ -290,7 +291,9 @@ export default function CapturePage() {
     const latestPillsTouched = pillsTouchedRef.current;
     const selection = [...selectedMembersRef.current];
     const peopleLockedSent = latestPillsTouched;
-    const lockedIncludedSent = peopleLockedSent ? selection : [];
+    const lockedIncludedSent = peopleLockedSent
+      ? resolveLockedSelection(selection, activeTrip.members)
+      : [];
 
     console.log("SAVE", {
       pillsTouched: latestPillsTouched,
@@ -303,16 +306,16 @@ export default function CapturePage() {
     setError("");
 
     try {
-      const draft = await addDraftExpense(
-        activeTrip.id,
-        capture,
-        peopleLockedSent
-          ? {
-              included: resolveLockedSelection(selection, activeTrip.members),
-              peopleLocked: true,
-            }
-          : undefined,
-      );
+      const draft = await addDraftExpense(activeTrip.id, capture);
+
+      if (peopleLockedSent) {
+        await updateExpense(draft.id, {
+          included: lockedIncludedSent,
+          peopleLocked: true,
+          lockedIncluded: lockedIncludedSent,
+          unmatchedNames: [],
+        });
+      }
 
       setRawText("");
       pillsTouchedRef.current = false;

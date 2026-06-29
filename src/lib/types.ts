@@ -28,7 +28,8 @@ export interface Expense {
   note: string;
   location: string | null;
   included: string[];
-  peopleLocked?: boolean;
+  peopleLocked: boolean;
+  lockedIncluded: string[];
   unmatchedNames: string[];
   splitType: SplitType;
   isPersonal: boolean;
