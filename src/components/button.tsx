@@ -17,12 +17,14 @@ const variantClasses: Record<ButtonVariant, string> = {
 
 export function Button({
   className = "",
+  style,
   variant = "primary",
   ...props
 }: ButtonProps) {
   return (
     <button
       className={`inline-flex min-h-11 items-center justify-center rounded-control border px-4 text-[0.9375rem] font-semibold transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed ${variantClasses[variant]} ${className}`}
+      style={{ borderRadius: "var(--radius-control)", ...style }}
       {...props}
     />
   );

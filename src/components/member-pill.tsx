@@ -23,6 +23,7 @@ export function MemberPill({
   className = "",
   name,
   state,
+  style,
   ...props
 }: MemberPillProps) {
   const isSelected = state === "selected";
@@ -31,6 +32,7 @@ export function MemberPill({
     <button
       aria-pressed={state === "unset" ? undefined : isSelected}
       className={`inline-flex min-h-11 items-center gap-2 rounded-pill border px-4 text-[0.9375rem] font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background ${stateClasses[state]} ${className}`}
+      style={{ borderRadius: "var(--radius-pill)", ...style }}
       type="button"
       {...props}
     >

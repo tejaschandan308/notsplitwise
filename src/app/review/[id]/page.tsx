@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/app/app-shell";
+import { Button } from "@/components/button";
+import { Chip } from "@/components/chip";
+import { MemberPill } from "@/components/member-pill";
+import { TopBar } from "@/components/top-bar";
 import {
   addParseStat,
   addTripMember,
@@ -361,37 +365,54 @@ export default function ReviewPage() {
 
   return (
     <AppShell>
-      <section className="flex flex-col gap-6 pt-4">
+      <section className="flex flex-col gap-6 pt-1 pb-5">
         <header>
-          <Link className="text-sm font-medium text-foreground/65" href="/inbox">
-            Back
-          </Link>
-          <p className="mt-5 text-sm text-foreground/55">{trip.name}</p>
-          <h1 className="text-3xl font-semibold">Review</h1>
+          <TopBar backHref="/inbox" tripName={trip.name} />
+          <h1 className="mt-1 px-1 text-[1.125rem] font-semibold text-foreground">
+            Review
+          </h1>
           {expense.confidence === "low" ? (
-            <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              Double-check this one.
-            </p>
+            <div className="mt-5 rounded-[var(--radius-control)] border border-signal-warm/35 bg-surface-raised px-4 py-3.5">
+              <p className="flex items-center gap-2 text-[0.9375rem] font-semibold text-foreground">
+                <span
+                  aria-hidden="true"
+                  className="size-2 rounded-full bg-signal-warm"
+                />
+                Double-check this one
+              </p>
+              <p className="mt-1 pl-4 text-[0.75rem] leading-5 text-muted">
+                We weren&apos;t fully sure on the amount or who&apos;s included.
+              </p>
+            </div>
           ) : null}
         </header>
 
         <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Amount</span>
-          <input
-            className="min-h-11 rounded-md border border-foreground/15 bg-transparent px-3 text-base outline-none focus:border-foreground/45"
-            inputMode="decimal"
-            min="0"
-            placeholder="Enter amount"
-            type="number"
-            value={amountText}
-            onChange={(event) => void handleAmountChange(event.target.value)}
-          />
+          <span className="px-0.5 text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-muted">
+            Amount
+          </span>
+          <span className="relative">
+            <span className="pointer-events-none absolute inset-y-0 left-4 flex items-center text-[1rem] text-muted">
+              {"\u20b9"}
+            </span>
+            <input
+              className="min-h-14 w-full rounded-[var(--radius-control)] border border-border bg-field pr-4 pl-9 text-[1.75rem] font-semibold text-foreground shadow-field outline-none placeholder:text-subtle focus:border-border-strong focus-visible:ring-2 focus-visible:ring-focus"
+              inputMode="decimal"
+              min="0"
+              placeholder="0"
+              type="number"
+              value={amountText}
+              onChange={(event) => void handleAmountChange(event.target.value)}
+            />
+          </span>
         </label>
 
         <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Note</span>
+          <span className="px-0.5 text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-muted">
+            Note
+          </span>
           <input
-            className="min-h-11 rounded-md border border-foreground/15 bg-transparent px-3 text-base outline-none focus:border-foreground/45"
+            className="min-h-12 w-full rounded-[var(--radius-control)] border border-border bg-field px-4 text-[0.9375rem] font-medium text-foreground shadow-field outline-none placeholder:text-subtle focus:border-border-strong focus-visible:ring-2 focus-visible:ring-focus"
             type="text"
             value={note}
             onChange={(event) => void handleNoteChange(event.target.value)}
@@ -399,10 +420,12 @@ export default function ReviewPage() {
         </label>
 
         <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Location</span>
+          <span className="px-0.5 text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-muted">
+            Location <span className="normal-case tracking-normal">· optional</span>
+          </span>
           <input
-            className="min-h-11 rounded-md border border-foreground/15 bg-transparent px-3 text-base outline-none focus:border-foreground/45"
-            placeholder="Optional"
+            className="min-h-12 w-full rounded-[var(--radius-control)] border border-border bg-field px-4 text-[0.9375rem] font-medium text-foreground shadow-field outline-none placeholder:text-subtle focus:border-border-strong focus-visible:ring-2 focus-visible:ring-focus"
+            placeholder="Add location"
             type="text"
             value={location}
             onChange={(event) => void handleLocationChange(event.target.value)}
@@ -410,65 +433,72 @@ export default function ReviewPage() {
         </label>
 
         <section>
-          <h2 className="text-sm font-medium">Category</h2>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <h2 className="px-0.5 text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-muted">
+            Category
+          </h2>
+          <div className="mt-2.5 flex flex-wrap gap-2">
             {categoryOptions.map((option) => (
-              <button
+              <Chip
                 key={option.value}
-                className={`min-h-10 px-3 text-sm ${
-                  category === option.value
-                    ? "bg-foreground text-background"
-                    : "text-foreground/70"
-                }`}
-                type="button"
+                label={option.label}
+                selected={category === option.value}
                 onClick={() => void handleCategoryChange(option.value)}
-              >
-                {option.label}
-              </button>
+              />
             ))}
           </div>
         </section>
 
         {unmatchedNames.length > 0 ? (
-          <section className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950">
-            <h2 className="font-semibold">Resolve names</h2>
-            <p className="mt-1 text-sm">
-              These names are not in this trip yet.
+          <section className="rounded-[var(--radius-control)] border border-signal-warm/55 bg-surface p-4">
+            <h2 className="flex items-center gap-2 text-[0.9375rem] font-semibold text-foreground">
+              <span
+                aria-hidden="true"
+                className="size-2 rounded-full bg-signal-warm"
+              />
+              A name we didn&apos;t recognize
+            </h2>
+            <p className="mt-1 pl-4 text-[0.75rem] leading-5 text-muted">
+              Decide what to do with each, so the split is right.
             </p>
-            <div className="mt-4 flex flex-col gap-4">
+            <div className="mt-3 border-t border-border pt-3">
               {unmatchedNames.map((name) => (
-                <div key={name} className="rounded-md bg-white/70 p-3">
-                  <h3 className="font-medium">{name}</h3>
-                  <p className="mt-3 text-xs font-medium uppercase tracking-wide">
+                <div key={name} className="not-last:mb-4">
+                  <h3 className="text-[0.9375rem] font-medium text-foreground">
+                    &ldquo;{name}&rdquo;
+                  </h3>
+                  <p className="mt-3 text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-muted">
                     Map to member
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {trip.members.map((member) => (
-                      <button
+                      <Button
                         key={member}
-                        className="min-h-9 px-3 text-sm"
+                        className="min-h-10 px-3 text-[0.8125rem]"
                         type="button"
+                        variant="secondary"
                         onClick={() => void mapUnmatchedName(name, member)}
                       >
                         {member}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      className="min-h-9 px-3 text-sm font-medium"
+                    <Button
+                      className="min-h-10 px-3 text-[0.8125rem]"
                       type="button"
+                      variant="secondary"
                       onClick={() => void addUnmatchedToTrip(name)}
                     >
                       Add to trip
-                    </button>
-                    <button
-                      className="min-h-9 px-3 text-sm"
+                    </Button>
+                    <Button
+                      className="min-h-10 px-3 text-[0.8125rem]"
                       type="button"
+                      variant="ghost"
                       onClick={() => void ignoreUnmatchedName(name)}
                     >
                       Ignore
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -476,46 +506,55 @@ export default function ReviewPage() {
           </section>
         ) : null}
 
-        <section className="rounded-lg border border-foreground/10 p-4">
+        <section className="rounded-[var(--radius-control)] border border-border bg-surface-raised p-4">
           <label className="flex min-h-11 items-center justify-between gap-4">
             <span>
-              <span className="block font-medium">Personal expense</span>
-              <span className="block text-sm text-foreground/55">
-                Only you are included.
+              <span className="block text-[0.9375rem] font-medium text-foreground">
+                Personal expense
+              </span>
+              <span className="block text-[0.75rem] text-muted">
+                Just mine — not shared
               </span>
             </span>
-            <input
-              checked={isPersonal}
-              className="h-5 w-5"
-              type="checkbox"
-              onChange={(event) => void handlePersonalToggle(event.target.checked)}
-            />
+            <span className="relative inline-flex min-h-11 items-center">
+              <input
+                checked={isPersonal}
+                className="peer sr-only"
+                type="checkbox"
+                onChange={(event) =>
+                  void handlePersonalToggle(event.target.checked)
+                }
+              />
+              <span className="h-7 w-12 rounded-[var(--radius-pill)] bg-border-strong transition-colors peer-checked:bg-accent peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background" />
+              <span className="pointer-events-none absolute left-1 size-5 rounded-full bg-surface shadow-pill transition-transform peer-checked:translate-x-5 peer-checked:bg-accent-contrast" />
+            </span>
           </label>
         </section>
 
         {!isPersonal ? (
-          <section className="rounded-xl border-2 border-foreground/20 p-4">
-            <h2 className="text-lg font-semibold">Who's included</h2>
-            <p className="mt-1 text-sm text-foreground/60">
-              Tap to confirm who shares this.
+          <section className="rounded-[calc(var(--radius-control)+0.25rem)] border-2 border-border-strong bg-surface p-4 shadow-field">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-[1rem] font-semibold text-foreground">
+                Who&apos;s included
+              </h2>
+              <p className="text-[0.8125rem] font-medium text-muted">
+                {included.length} of {trip.members.length}
+              </p>
+            </div>
+            <p className="mt-1 max-w-[19rem] text-[0.75rem] leading-5 text-muted">
+              Confirm exactly who shares this — a wrong tap moves real money.
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2.5">
               {trip.members.map((member) => {
                 const isIncluded = included.includes(member);
 
                 return (
-                  <button
+                  <MemberPill
                     key={member}
-                    className={`min-h-11 px-4 text-sm font-medium ${
-                      isIncluded
-                        ? "bg-foreground text-background"
-                        : "text-foreground/65"
-                    }`}
-                    type="button"
+                    name={member}
+                    state={isIncluded ? "selected" : "unselected"}
                     onClick={() => void handleIncludedToggle(member)}
-                  >
-                    {member}
-                  </button>
+                  />
                 );
               })}
             </div>
@@ -524,53 +563,58 @@ export default function ReviewPage() {
 
         {!isPersonal ? (
           <section>
-            <h2 className="text-sm font-medium">Split</h2>
+            <h2 className="px-0.5 text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-muted">
+              Split
+            </h2>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {(["equal", "custom"] as SplitType[]).map((option) => (
-                <button
+                <Button
                   key={option}
-                  className={`min-h-10 px-3 text-sm capitalize ${
-                    splitType === option
-                      ? "bg-foreground text-background"
-                      : "text-foreground/70"
-                  }`}
+                  className="capitalize"
                   type="button"
+                  variant={splitType === option ? "primary" : "secondary"}
                   onClick={() => void handleSplitChange(option)}
                 >
                   {option}
-                </button>
+                </Button>
               ))}
             </div>
             {splitType === "custom" ? (
-              <p className="mt-2 text-sm text-foreground/60">
-                You'll enter exact amounts in Splitwise.
+              <p className="mt-2 text-[0.75rem] text-muted">
+                You&apos;ll enter exact amounts in Splitwise.
               </p>
-            ) : null}
+            ) : (
+              <p className="mt-2 text-[0.75rem] text-muted">
+                Split equally across {included.length}{" "}
+                {included.length === 1 ? "person" : "people"}.
+              </p>
+            )}
           </section>
         ) : null}
 
         {validationMessage ? (
-          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p className="rounded-[var(--radius-control)] border border-signal-warm/55 bg-surface-raised px-3 py-2 text-[0.8125rem] text-signal-warm">
             {validationMessage}
           </p>
         ) : null}
 
         <section className="flex flex-col gap-3 pb-4">
-          <button
-            className="min-h-12 rounded-md bg-foreground px-4 text-base font-semibold text-background disabled:cursor-not-allowed disabled:opacity-45"
+          <Button
+            className="min-h-12 w-full text-base"
             disabled={isSubmitting}
             type="button"
             onClick={() => void handleMarkReady()}
           >
             {isSubmitting ? "Saving..." : "Mark as Ready"}
-          </button>
-          <button
-            className="min-h-11 px-4 text-sm text-foreground/65"
+          </Button>
+          <Button
+            className="w-full"
             type="button"
+            variant="ghost"
             onClick={() => void handleDelete()}
           >
             {deleteConfirm ? "Confirm delete" : "Delete"}
-          </button>
+          </Button>
         </section>
       </section>
     </AppShell>
