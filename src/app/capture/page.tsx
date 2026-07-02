@@ -4,6 +4,9 @@ import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/app/app-shell";
+import { Button } from "@/components/button";
+import { MemberPill } from "@/components/member-pill";
+import { TopBar } from "@/components/top-bar";
 import {
   addDraftExpense,
   addTripMember,
@@ -295,13 +298,6 @@ export default function CapturePage() {
       ? resolveLockedSelection(selection, activeTrip.members)
       : [];
 
-    console.log("SAVE", {
-      pillsTouched: latestPillsTouched,
-      selection,
-      peopleLockedSent,
-      lockedIncludedSent,
-    });
-
     setIsSaving(true);
     setError("");
 
@@ -371,101 +367,85 @@ export default function CapturePage() {
 
   return (
     <AppShell>
-      <section className="flex min-h-[calc(100dvh-8rem)] flex-col justify-between gap-8 pt-4">
-        <div>
-          <div className="mb-8">
-            <div className="flex items-center gap-2">
-              <button
-                className="min-h-11 border-0 px-0 text-left text-sm font-medium text-foreground/70"
-                type="button"
-                // TODO: wire trip switching in a later phase.
-                onClick={() => undefined}
-              >
-                {activeTrip.name}
-              </button>
-              <button
-                aria-expanded={isMemberInputOpen}
-                aria-label="Add trip member"
-                className="flex size-11 items-center justify-center text-foreground/65"
-                title="Add trip member"
-                type="button"
-                onClick={() => {
-                  if (isMemberInputOpen) {
-                    closeMemberInput();
-                  } else {
-                    setMemberMessage("");
-                    setIsMemberInputOpen(true);
+      <section className="flex min-h-[calc(100dvh-8rem)] flex-col pt-1">
+        <TopBar
+          isAddMemberOpen={isMemberInputOpen}
+          tripName={activeTrip.name}
+          // TODO: wire trip switching in a later phase.
+          onTripClick={() => undefined}
+          onAddMemberClick={() => {
+            if (isMemberInputOpen) {
+              closeMemberInput();
+            } else {
+              setMemberMessage("");
+              setIsMemberInputOpen(true);
+            }
+          }}
+        />
+
+        {isMemberInputOpen ? (
+          <form
+            className="mt-3 flex flex-wrap items-start gap-2 rounded-control border border-border bg-surface p-3 shadow-field"
+            onSubmit={handleAddMember}
+          >
+            <div className="min-w-0 flex-1">
+              <label className="sr-only" htmlFor="new-trip-member">
+                New trip member
+              </label>
+              <input
+                ref={memberInputRef}
+                className="min-h-11 w-full rounded-control border border-border bg-field px-3 text-[0.9375rem] text-foreground outline-none placeholder:text-subtle focus-visible:ring-2 focus-visible:ring-focus"
+                id="new-trip-member"
+                placeholder="Name"
+                value={memberName}
+                onChange={(event) => {
+                  setMemberName(event.target.value);
+                  setMemberMessage("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
                   }
                 }}
-              >
-                <span aria-hidden="true" className="relative h-5 w-6">
-                  <span className="absolute left-1 top-0 size-2 rounded-full border border-current" />
-                  <span className="absolute bottom-0 left-0 h-2.5 w-4 rounded-t-full border border-b-0 border-current" />
-                  <span className="absolute right-0 top-1 text-base leading-none">
-                    +
-                  </span>
-                </span>
-              </button>
+              />
+              {memberMessage ? (
+                <p className="mt-1.5 text-xs text-signal-warm">
+                  {memberMessage}
+                </p>
+              ) : null}
             </div>
+            <Button
+              className="px-3"
+              disabled={isAddingMember}
+              type="submit"
+              variant="secondary"
+            >
+              {isAddingMember ? "Adding..." : "Add"}
+            </Button>
+            <Button
+              className="px-3"
+              type="button"
+              variant="ghost"
+              onClick={closeMemberInput}
+            >
+              Cancel
+            </Button>
+          </form>
+        ) : null}
 
-            {isMemberInputOpen ? (
-              <form
-                className="mt-2 flex flex-wrap items-start gap-2"
-                onSubmit={handleAddMember}
-              >
-                <div>
-                  <label className="sr-only" htmlFor="new-trip-member">
-                    New trip member
-                  </label>
-                  <input
-                    ref={memberInputRef}
-                    className="min-h-11 w-44 rounded-md border border-foreground/20 bg-transparent px-3 text-sm outline-none focus:border-foreground/45"
-                    id="new-trip-member"
-                    placeholder="Name"
-                    value={memberName}
-                    onChange={(event) => {
-                      setMemberName(event.target.value);
-                      setMemberMessage("");
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        event.currentTarget.form?.requestSubmit();
-                      }
-                    }}
-                  />
-                  {memberMessage ? (
-                    <p className="mt-1 text-xs text-foreground/60">
-                      {memberMessage}
-                    </p>
-                  ) : null}
-                </div>
-                <button
-                  className="min-h-11 px-3 text-sm font-medium"
-                  disabled={isAddingMember}
-                  type="submit"
-                >
-                  {isAddingMember ? "Adding..." : "Add"}
-                </button>
-                <button
-                  className="min-h-11 px-3 text-sm text-foreground/65"
-                  type="button"
-                  onClick={closeMemberInput}
-                >
-                  Cancel
-                </button>
-              </form>
-            ) : null}
-          </div>
-
-          <form className="flex flex-col gap-3" onSubmit={handleSave}>
-            <label className="sr-only" htmlFor="capture-text">
-              Expense capture
+        <div className="mt-20 sm:mt-24">
+          <form className="flex flex-col" onSubmit={handleSave}>
+            <label
+              className="mb-3 px-1 text-[0.75rem] font-semibold uppercase tracking-[0.14em] text-muted"
+              htmlFor="capture-text"
+            >
+              Add an expense
             </label>
             <textarea
               ref={inputRef}
               autoFocus
-              className="min-h-36 resize-none rounded-lg border border-foreground/15 bg-transparent px-4 py-4 text-lg leading-7 outline-none focus:border-foreground/45"
+              className="min-h-56 resize-none rounded-[1.25rem] border border-border bg-field px-6 py-7 text-[2rem] font-medium leading-[1.42] text-foreground shadow-field outline-none transition-colors placeholder:text-subtle focus:border-border-strong focus-visible:ring-2 focus-visible:ring-focus"
               id="capture-text"
               placeholder="e.g. 1240 airport lunch, me + Aman"
               value={rawText}
@@ -474,69 +454,61 @@ export default function CapturePage() {
                 setError("");
               }}
             />
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium">People</p>
-                <button
-                  className="min-h-11 px-2 text-sm font-medium text-foreground/70"
-                  type="button"
-                  onClick={toggleAllMembers}
-                >
-                  {toggleAllLabel}
-                </button>
-              </div>
+            <div className="mt-4 flex flex-wrap items-center gap-2.5">
               <div
                 aria-label="People included"
-                className="flex flex-wrap gap-2"
+                className="contents"
               >
                 {activeTrip.members.map((member) => {
                   const isSelected = selectedMembers.includes(member);
+                  const state = !pillsTouched
+                    ? "unset"
+                    : isSelected
+                      ? "selected"
+                      : "unselected";
 
                   return (
-                    <button
+                    <MemberPill
                       key={member}
-                      aria-pressed={pillsTouched ? isSelected : undefined}
-                      className={`min-h-11 rounded-full border px-4 text-sm font-medium ${
-                        !pillsTouched
-                          ? "border-foreground/20 bg-transparent text-foreground/50"
-                          : isSelected
-                            ? "border-foreground bg-foreground text-background"
-                            : "border-foreground/25 bg-transparent text-foreground/70"
-                      }`}
-                      type="button"
+                      name={member}
+                      state={state}
                       onClick={() => toggleMember(member)}
-                    >
-                      {pillsTouched && isSelected ? (
-                        <span aria-hidden="true" className="mr-1">
-                          {"\u2713"}
-                        </span>
-                      ) : null}
-                      {member}
-                    </button>
+                    />
                   );
                 })}
               </div>
-              {!pillsTouched ? (
-                <p className="text-xs text-foreground/55">
-                  Defaults to everyone, or uses people named in your text.
-                </p>
-              ) : null}
+              <button
+                className="ml-1 inline-flex min-h-11 items-center border-y-0 border-r-0 border-l border-border bg-transparent px-4 text-[0.9375rem] font-semibold text-foreground outline-none transition-colors hover:text-muted focus-visible:ring-2 focus-visible:ring-focus"
+                type="button"
+                onClick={toggleAllMembers}
+              >
+                {toggleAllLabel}
+              </button>
             </div>
-            <button
-              className="min-h-12 rounded-md bg-foreground px-4 text-base font-semibold text-background disabled:cursor-not-allowed disabled:opacity-45"
+            <Button
+              className="mt-5 min-h-[3.25rem] w-full text-base"
               disabled={!rawText.trim() || isSaving}
               type="submit"
             >
               {isSaving ? "Saving..." : "Save"}
-            </button>
+            </Button>
           </form>
 
           {showHint ? (
-            <div className="mt-3 flex items-start justify-between gap-3 text-sm text-foreground/60">
-              <p>Type it, or tap mic on your keyboard to speak.</p>
+            <div className="mt-4 flex min-h-8 items-center justify-between gap-3 text-[0.8125rem] text-muted">
+              <p className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="relative inline-block h-4 w-3"
+                >
+                  <span className="absolute left-1 top-0 h-2.5 w-1.5 rounded-full border border-current" />
+                  <span className="absolute bottom-0 left-0 h-2 w-3 rounded-b-full border-b border-l border-r border-current" />
+                </span>
+                Type it, or tap the mic on your keyboard to speak.
+              </p>
               <button
                 aria-label="Dismiss mic hint"
-                className="min-h-7 border-0 px-1 text-foreground/50"
+                className="flex size-11 shrink-0 items-center justify-center border-0 bg-transparent p-0 text-subtle outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
                 type="button"
                 onClick={dismissHint}
               >
@@ -545,21 +517,33 @@ export default function CapturePage() {
             </div>
           ) : null}
 
-          {saveMessage ? (
-            <p className="mt-3 text-sm text-foreground/70">{saveMessage}</p>
-          ) : null}
+          <div className="mt-1 min-h-6" aria-live="polite">
+            {saveMessage ? (
+              <p className="capture-saved-feedback flex items-center gap-2 text-[0.8125rem] font-medium text-muted">
+                <span
+                  aria-hidden="true"
+                  className="flex size-4 items-center justify-center rounded-full border border-border-strong text-[0.625rem]"
+                >
+                  {"\u2713"}
+                </span>
+                {saveMessage}
+              </p>
+            ) : null}
+          </div>
 
-          {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+          {error ? (
+            <p className="mt-2 text-[0.8125rem] text-signal-warm">{error}</p>
+          ) : null}
         </div>
 
         {draftCount > 0 ? (
           <Link
-            className="self-start text-sm font-medium text-foreground/70"
+            className="mt-auto self-center px-3 py-3 text-[0.875rem] font-medium text-muted outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
             href="/inbox"
           >
             {`${draftCount} ${
               draftCount === 1 ? "draft" : "drafts"
-            } waiting ->`}
+            } waiting \u2192`}
           </Link>
         ) : null}
       </section>

@@ -62,12 +62,6 @@ function enforcePeopleLock(
       }
     : data;
 
-  console.log("PARSE", {
-    peopleLocked,
-    lockedIncluded,
-    finalIncluded: finalData.included,
-  });
-
   return finalData;
 }
 

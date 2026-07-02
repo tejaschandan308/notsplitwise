@@ -1,5 +1,26 @@
 import type { Metadata, Viewport } from "next";
+import { Schibsted_Grotesk } from "next/font/google";
 import "./globals.css";
+
+const schibstedGrotesk = Schibsted_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-schibsted",
+  display: "swap",
+});
+
+const themeScript = `
+  (() => {
+    try {
+      const stored = localStorage.getItem("log-now:theme");
+      const theme = stored === "light" || stored === "dark"
+        ? stored
+        : matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+      document.documentElement.classList.add(theme);
+    } catch {}
+  })();
+`;
 
 export const metadata: Metadata = {
   title: "Log Now. Split Later.",
@@ -16,7 +37,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0b0f14",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fafafd" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0b" },
+  ],
 };
 
 export default function RootLayout({
@@ -25,7 +49,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html
+      lang="en"
+      className={`${schibstedGrotesk.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-full">{children}</body>
     </html>
   );
