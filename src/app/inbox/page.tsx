@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/app/app-shell";
+import { Button } from "@/components/button";
+import { Chip } from "@/components/chip";
+import { TopBar } from "@/components/top-bar";
 import { buildExportText } from "@/lib/export";
 import { reparsePendingDrafts } from "@/lib/reparse";
 import {
@@ -26,7 +29,7 @@ function formatAmount(amount: number | null): string {
     return "no amount yet";
   }
 
-  return `Rs ${amount}`;
+  return `\u20b9${amount}`;
 }
 
 function relativeTime(timestamp: number): string {
@@ -67,9 +70,12 @@ function ConfidenceFlag({
   }
 
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-amber-700">
-      <span className="h-2 w-2 rounded-full bg-amber-500" />
-      needs a look
+    <span
+      aria-label="needs a look"
+      className="inline-flex size-2 shrink-0 rounded-full bg-signal-warm"
+      title="needs a look"
+    >
+      <span className="sr-only">needs a look</span>
     </span>
   );
 }
@@ -81,13 +87,13 @@ function ParseState({ expense }: { expense: Expense }) {
 
   if (expense.parseStatus === "pending") {
     return (
-      <span className="text-xs text-foreground/55" aria-label="Parsing">
+      <span className="text-xs text-muted" aria-label="Parsing">
         parsing...
       </span>
     );
   }
 
-  return <span className="text-xs text-foreground/55">not parsed yet</span>;
+  return <span className="text-xs text-muted">not parsed yet</span>;
 }
 
 export default function InboxPage() {
@@ -301,7 +307,7 @@ export default function InboxPage() {
     return (
       <AppShell>
         <section className="flex min-h-[60dvh] items-center justify-center">
-          <p className="text-sm text-foreground/60">Loading...</p>
+          <p className="text-sm text-muted">Loading...</p>
         </section>
       </AppShell>
     );
@@ -309,28 +315,34 @@ export default function InboxPage() {
 
   return (
     <AppShell>
-      <section className="flex flex-col gap-5 pt-4">
-        <header className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm text-foreground/55">{activeTrip?.name}</p>
-            <h1 className="text-3xl font-semibold">Inbox</h1>
+      <section className="flex flex-col pt-1 pb-5">
+        <header>
+          <TopBar tripName={activeTrip?.name ?? ""} />
+          <div className="mt-2 flex min-h-11 items-center justify-between gap-3 px-1">
+            <h1 className="text-[1.25rem] font-semibold text-foreground">
+              Inbox
+            </h1>
+            {currentTab === "ready" ? (
+              <button
+                className="min-h-11 border-0 bg-transparent px-1 text-[0.875rem] font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                style={{
+                  border: 0,
+                  borderRadius: "var(--radius-control)",
+                }}
+                type="button"
+                onClick={() => {
+                  setSelectMode((value) => !value);
+                  setSelectedIds([]);
+                  setNotice("");
+                }}
+              >
+                {selectMode ? "Done" : "Select"}
+              </button>
+            ) : null}
           </div>
-          {currentTab === "ready" ? (
-            <button
-              className="min-h-10 px-3 text-sm"
-              type="button"
-              onClick={() => {
-                setSelectMode((value) => !value);
-                setSelectedIds([]);
-                setNotice("");
-              }}
-            >
-              {selectMode ? "Done" : "Select"}
-            </button>
-          ) : null}
         </header>
 
-        <div className="grid grid-cols-2 gap-2 rounded-lg bg-foreground/5 p-1">
+        <div className="mt-1 flex border-b border-border">
           {tabs.map((tab) => {
             const isActive = currentTab === tab.id;
             const count = tab.id === "draft" ? drafts.length : ready.length;
@@ -338,127 +350,243 @@ export default function InboxPage() {
             return (
               <button
                 key={tab.id}
-                className={`min-h-10 border-0 text-sm font-medium ${
-                  isActive ? "bg-background shadow-sm" : "text-foreground/60"
+                className={`relative flex min-h-12 items-center gap-2 border-0 bg-transparent px-1 text-[0.875rem] font-medium outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+                  isActive ? "text-foreground" : "text-muted"
                 }`}
+                style={{ border: 0 }}
                 type="button"
                 onClick={() => {
                   setCurrentTab(tab.id);
                   setNotice("");
                 }}
               >
-                {tab.label}{" "}
-                <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-xs">
+                {tab.label}
+                <span
+                  className={`inline-flex size-6 items-center justify-center rounded-full text-[0.75rem] font-semibold ${
+                    isActive
+                      ? "bg-accent text-accent-contrast"
+                      : "bg-surface-raised text-muted"
+                  }`}
+                >
                   {count}
                 </span>
+                {isActive ? (
+                  <span className="absolute inset-x-0 -bottom-px h-0.5 bg-accent" />
+                ) : null}
               </button>
             );
           })}
         </div>
 
         {selectMode && currentTab === "ready" ? (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-foreground/10 p-3">
-            <button className="min-h-10 px-3 text-sm" onClick={handleSelectAll}>
-              {selectedIds.length === ready.length ? "Clear all" : "Select All"}
-            </button>
-            {selectedIds.length > 0 ? (
+          <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.25rem)] z-20 border-t border-border bg-background/95 px-5 py-3 backdrop-blur">
+            <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
               <button
-                className="min-h-10 bg-foreground px-3 text-sm font-medium text-background"
+                className="flex min-h-11 items-center gap-2 border-0 bg-transparent px-0 text-[0.875rem] font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                style={{
+                  border: 0,
+                  borderRadius: "var(--radius-control)",
+                }}
                 type="button"
-                onClick={handleExport}
+                onClick={handleSelectAll}
               >
-                Export
+                <span
+                  aria-hidden="true"
+                  className={`inline-flex size-5 items-center justify-center border text-[0.75rem] ${
+                    selectedIds.length === ready.length && ready.length > 0
+                      ? "border-accent bg-accent text-accent-contrast"
+                      : "border-border-strong bg-surface text-transparent"
+                  }`}
+                  style={{
+                    borderRadius: "calc(var(--radius-control) / 2)",
+                  }}
+                >
+                  {"\u2713"}
+                </span>
+                {selectedIds.length === ready.length && ready.length > 0
+                  ? "Clear all"
+                  : "Select all"}
               </button>
-            ) : null}
+              {selectedIds.length > 0 ? (
+                <Button
+                  className="min-w-28"
+                  type="button"
+                  onClick={handleExport}
+                >
+                  Export {selectedIds.length}
+                </Button>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
-        {notice ? <p className="text-sm text-foreground/60">{notice}</p> : null}
+        {notice ? <p className="mt-4 text-sm text-muted">{notice}</p> : null}
 
         {visibleExpenses.length === 0 ? (
-          <p className="rounded-lg border border-foreground/10 p-5 text-sm text-foreground/60">
-            {currentTab === "draft"
-              ? "No drafts - captured expenses show up here."
-              : "Nothing ready yet."}
-          </p>
+          <div className="flex min-h-[19rem] flex-col items-center justify-center px-8 text-center">
+            <span className="flex size-16 items-center justify-center rounded-[var(--radius-control)] border border-border text-muted">
+              <span className="flex flex-col gap-1">
+                <span className="h-px w-6 bg-border-strong" />
+                <span className="h-px w-6 bg-border-strong" />
+                <span className="h-px w-4 bg-border-strong" />
+              </span>
+            </span>
+            <p className="mt-5 text-[1.125rem] font-medium text-foreground">
+              {currentTab === "draft" ? "All caught up" : "Nothing ready yet"}
+            </p>
+            <p className="mt-3 max-w-64 text-[0.875rem] leading-6 text-muted">
+              {currentTab === "draft"
+                ? "Captured expenses will show up here to review."
+                : "Confirmed expenses land here, ready to export."}
+            </p>
+          </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div
+            className={
+              selectMode && currentTab === "ready" ? "pb-20" : undefined
+            }
+          >
             {visibleExpenses.map((expense) => (
               <article
                 key={expense.id}
-                className="rounded-lg border border-foreground/10 p-4"
+                className={`border-b border-border py-4 transition-colors ${
+                  selectMode &&
+                  currentTab === "ready" &&
+                  selectedSet.has(expense.id)
+                    ? "bg-surface-raised"
+                    : "bg-transparent"
+                }`}
               >
-                <div className="flex gap-3">
+                <div className="flex items-center gap-3">
                   {selectMode && currentTab === "ready" ? (
                     <input
                       aria-label={`Select ${displayTitle(expense)}`}
                       checked={selectedSet.has(expense.id)}
-                      className="mt-1 h-5 w-5"
+                      className="size-5 shrink-0 accent-accent"
                       type="checkbox"
                       onChange={() => toggleSelected(expense.id)}
                     />
                   ) : null}
 
                   <button
-                    className="min-h-0 flex-1 border-0 p-0 text-left"
+                    className="min-h-11 min-w-0 flex-1 border-0 bg-transparent p-0 text-left outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                    style={{
+                      border: 0,
+                      borderRadius: "var(--radius-control)",
+                    }}
                     type="button"
                     onClick={() => openReview(expense)}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
                         <p
                           className={
                             expense.amount === null
-                              ? "text-sm text-foreground/45"
-                              : "font-semibold"
+                              ? "text-[0.9375rem] font-medium text-subtle"
+                              : "text-[1rem] font-semibold text-foreground"
                           }
                         >
                           {formatAmount(expense.amount)}
                         </p>
-                        <h2 className="mt-1 font-medium">
-                          {displayTitle(expense)}
-                        </h2>
+                        {currentTab === "draft" &&
+                        expense.parseStatus === "pending" ? (
+                          <ParseState expense={expense} />
+                        ) : null}
+                        <ConfidenceFlag
+                          expense={expense}
+                          show={currentTab === "draft"}
+                        />
                       </div>
-                      <span className="shrink-0 text-xs text-foreground/45">
-                        {relativeTime(expense.createdAt)}
-                      </span>
+                      <h2 className="mt-1 truncate text-[0.875rem] font-normal text-muted">
+                        {displayTitle(expense)}
+                      </h2>
                     </div>
 
-                    {currentTab === "ready" ? (
-                      <p className="mt-2 text-sm text-foreground/60">
-                        {expense.category ?? "other"} ·{" "}
-                        {expense.included.join(", ")}
-                      </p>
-                    ) : null}
-
-                    <div className="mt-3 flex flex-wrap items-center gap-3">
-                      <ConfidenceFlag
-                        expense={expense}
-                        show={currentTab === "draft"}
-                      />
-                      <ParseState expense={expense} />
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[0.75rem] text-subtle">
+                      <span>{relativeTime(expense.createdAt)}</span>
+                      {currentTab === "ready" ? (
+                        <>
+                          <span aria-hidden="true">{"\u00b7"}</span>
+                          <span className="truncate">
+                            {expense.included.join(", ")}
+                          </span>
+                        </>
+                      ) : null}
+                      {currentTab === "draft" &&
+                      expense.parseStatus === "failed" ? (
+                        <>
+                          <span aria-hidden="true">{"\u00b7"}</span>
+                          <ParseState expense={expense} />
+                        </>
+                      ) : null}
                     </div>
                   </button>
-                </div>
 
-                <div className="mt-3 flex justify-end gap-2">
-                  {expense.parseStatus === "failed" &&
-                  currentTab === "draft" ? (
-                    <button
-                      className="min-h-9 px-3 text-sm text-foreground/65"
-                      type="button"
-                      onClick={() => handleRetry(expense)}
-                    >
-                      retry
-                    </button>
+                  {currentTab === "ready" ? (
+                    <Chip
+                      className="min-h-9 shrink-0 px-3 text-[0.75rem] capitalize text-muted"
+                      disabled
+                      label={expense.category ?? "other"}
+                      selected={false}
+                      tabIndex={-1}
+                    />
                   ) : null}
-                  <button
-                    className="min-h-9 px-3 text-sm text-foreground/65"
-                    type="button"
-                    onClick={() => handleDelete(expense)}
-                  >
-                    {deleteConfirmId === expense.id ? "confirm delete" : "delete"}
-                  </button>
+
+                  {!selectMode ? (
+                    <div className="flex shrink-0 items-center gap-1">
+                      {expense.parseStatus === "failed" &&
+                      currentTab === "draft" ? (
+                        <button
+                          className="min-h-11 border-0 bg-transparent px-2 text-[0.75rem] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                          style={{
+                            border: 0,
+                            borderRadius: "var(--radius-control)",
+                          }}
+                          type="button"
+                          onClick={() => handleRetry(expense)}
+                        >
+                          retry
+                        </button>
+                      ) : null}
+                      <button
+                        aria-label={
+                          deleteConfirmId === expense.id
+                            ? "Confirm delete"
+                            : "Delete"
+                        }
+                        className="flex size-11 items-center justify-center border border-border bg-transparent p-0 text-muted outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
+                        style={{ borderRadius: "var(--radius-control)" }}
+                        title={
+                          deleteConfirmId === expense.id
+                            ? "Confirm delete"
+                            : "Delete"
+                        }
+                        type="button"
+                        onClick={() => handleDelete(expense)}
+                      >
+                        {deleteConfirmId === expense.id ? (
+                          <span className="text-[0.6875rem] font-semibold">
+                            confirm
+                          </span>
+                        ) : (
+                          <svg
+                            aria-hidden="true"
+                            className="size-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              d="M4 7h16M9 11v6M15 11v6M6.5 7l1 14h9l1-14M9 7l.75-3h4.5L15 7"
+                              stroke="currentColor"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="1.6"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </article>
             ))}
