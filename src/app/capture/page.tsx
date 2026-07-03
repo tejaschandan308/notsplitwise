@@ -460,12 +460,9 @@ export default function CapturePage() {
                 className="contents"
               >
                 {activeTrip.members.map((member) => {
-                  const isSelected = selectedMembers.includes(member);
-                  const state = !pillsTouched
-                    ? "unset"
-                    : isSelected
-                      ? "selected"
-                      : "unselected";
+                  const state = selectedMembers.includes(member)
+                    ? "selected"
+                    : "unselected";
 
                   return (
                     <MemberPill
