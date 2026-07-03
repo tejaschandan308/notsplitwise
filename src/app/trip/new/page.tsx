@@ -2,6 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/button";
 import { createTrip } from "@/lib/storage";
 
 type AddPersonResult = {
@@ -117,22 +118,26 @@ export default function CreateTripPage() {
   }
 
   return (
-    <main className="min-h-dvh bg-background px-5 pt-[calc(env(safe-area-inset-top)+2rem)] pb-[calc(env(safe-area-inset-bottom)+2rem)] text-foreground">
+    <main className="min-h-dvh bg-background px-5 pt-[calc(env(safe-area-inset-top)+2.5rem)] pb-[calc(env(safe-area-inset-bottom)+2rem)] text-foreground">
       <form
-        className="mx-auto flex w-full max-w-md flex-col gap-7"
+        className="mx-auto flex w-full max-w-md flex-col gap-8"
         onSubmit={handleStartTrip}
       >
         <header>
-          <h1 className="text-3xl font-semibold">New trip</h1>
-          <p className="mt-2 text-sm text-foreground/65">
+          <h1 className="text-[2rem] font-semibold leading-tight text-foreground">
+            New trip
+          </h1>
+          <p className="mt-2 max-w-sm text-[0.9375rem] leading-6 text-muted">
             Name the trip and add the people you will split with.
           </p>
         </header>
 
-        <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium">Trip name</span>
+        <label className="flex flex-col gap-2.5">
+          <span className="px-0.5 text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-muted">
+            Trip name
+          </span>
           <input
-            className="min-h-11 rounded-md border border-foreground/15 bg-transparent px-3 text-base outline-none focus:border-foreground/45"
+            className="min-h-13 rounded-control border border-border bg-field px-4 text-[1rem] font-medium text-foreground shadow-field outline-none placeholder:text-subtle focus:border-border-strong focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             placeholder="Goa Trip"
             type="text"
             value={tripName}
@@ -143,13 +148,15 @@ export default function CreateTripPage() {
           />
         </label>
 
-        <section className="flex flex-col gap-3">
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium">Add people</span>
+        <section className="flex flex-col gap-4">
+          <label className="flex flex-col gap-2.5">
+            <span className="px-0.5 text-[0.75rem] font-semibold uppercase tracking-[0.12em] text-muted">
+              Add people
+            </span>
             <span className="flex gap-2">
               <input
                 ref={personInputRef}
-                className="min-h-11 min-w-0 flex-1 rounded-md border border-foreground/15 bg-transparent px-3 text-base outline-none focus:border-foreground/45"
+                className="min-h-13 min-w-0 flex-1 rounded-control border border-border bg-field px-4 text-[1rem] text-foreground shadow-field outline-none placeholder:text-subtle focus:border-border-strong focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 placeholder="Aman"
                 type="text"
                 value={personName}
@@ -160,34 +167,41 @@ export default function CreateTripPage() {
                 }}
                 onKeyDown={handlePersonKeyDown}
               />
-              <button
-                className="min-h-11 px-4 text-sm font-medium"
+              <Button
+                className="min-h-13 shrink-0"
                 type="button"
+                variant="secondary"
                 onClick={handleAddPerson}
               >
                 Add
-              </button>
+              </Button>
             </span>
           </label>
 
-          <p className="text-sm text-foreground/60">
+          <p className="text-[0.8125rem] leading-5 text-muted">
             Me (you) is included automatically. Add only the other people on
             this trip.
           </p>
 
-          {note ? <p className="text-sm text-foreground/75">{note}</p> : null}
+          {note ? (
+            <p className="text-[0.8125rem] text-signal-warm">{note}</p>
+          ) : null}
 
           {otherMembers.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2.5">
               {otherMembers.map((member) => (
                 <span
                   key={member}
-                  className="inline-flex min-h-9 items-center gap-2 rounded-full border border-foreground/15 px-3 text-sm"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-border-strong bg-surface px-4 text-[0.875rem] font-medium text-foreground shadow-pill"
                 >
                   {member}
                   <button
                     aria-label={`Remove ${member}`}
-                    className="min-h-7 rounded-full border-0 px-1 text-foreground/55"
+                    className="flex size-7 min-h-7 items-center justify-center border-0 bg-transparent p-0 text-muted outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
+                    style={{
+                      border: 0,
+                      borderRadius: "var(--radius-pill)",
+                    }}
                     type="button"
                     onClick={() => handleRemovePerson(member)}
                   >
@@ -199,15 +213,17 @@ export default function CreateTripPage() {
           ) : null}
         </section>
 
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? (
+          <p className="text-[0.8125rem] text-signal-warm">{error}</p>
+        ) : null}
 
-        <button
-          className="min-h-12 rounded-md bg-foreground px-4 text-base font-semibold text-background disabled:cursor-not-allowed disabled:opacity-45"
+        <Button
+          className="min-h-12 w-full text-base"
           disabled={!canStart || isSubmitting}
           type="submit"
         >
           {isSubmitting ? "Starting..." : "Start Trip"}
-        </button>
+        </Button>
       </form>
     </main>
   );
