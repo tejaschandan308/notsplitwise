@@ -372,7 +372,6 @@ export default function CapturePage() {
           isAddMemberOpen={isMemberInputOpen}
           tripName={activeTrip.name}
           // TODO: wire trip switching in a later phase.
-          onTripClick={() => undefined}
           onAddMemberClick={() => {
             if (isMemberInputOpen) {
               closeMemberInput();
