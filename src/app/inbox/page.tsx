@@ -595,9 +595,16 @@ export default function InboxPage() {
       </section>
 
       {isExportOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/35 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8">
+        <div
+          className="fixed inset-0 z-50 flex items-end px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8"
+          style={{
+            backgroundColor:
+              "color-mix(in srgb, var(--background) 56%, var(--foreground) 24%)",
+          }}
+        >
           <div
-            className="max-h-[90dvh] w-full rounded-t-2xl bg-background p-4 shadow-xl"
+            className="max-h-[90dvh] w-full overflow-y-auto rounded-control border border-border bg-surface p-4 shadow-field"
+            style={{ borderRadius: "var(--radius-control)" }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="export-title"
@@ -610,48 +617,59 @@ export default function InboxPage() {
                     ? "expense"
                     : "expenses"}
                 </h2>
-                <p className="mt-1 text-sm text-foreground/60">
+                <p className="mt-1 text-sm text-muted">
                   Copy this into Splitwise when you are ready.
                 </p>
               </div>
-              <button
-                className="min-h-10 px-3 text-sm text-foreground/65"
+              <Button
+                className="min-h-10 px-3 text-sm"
+                variant="ghost"
                 type="button"
                 onClick={() => closeExportOverlay()}
               >
                 Close
-              </button>
+              </Button>
             </div>
 
             <textarea
-              className="mt-4 h-64 w-full resize-none rounded-lg border border-foreground/15 bg-foreground/5 p-3 font-mono text-sm leading-6 text-foreground"
+              className="mt-4 h-64 w-full resize-none rounded-control border border-border bg-field p-3 font-mono text-sm leading-6 text-foreground shadow-field outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              style={{ borderRadius: "var(--radius-control)" }}
               readOnly
               value={exportText}
             />
 
             {copyStatus === "copied" ? (
-              <p className="mt-3 text-sm font-medium text-green-700">
+              <p className="mt-3 flex items-center gap-2 text-[0.8125rem] font-medium text-muted">
+                <span
+                  aria-hidden="true"
+                  className="flex size-4 items-center justify-center rounded-full border border-border-strong text-[0.625rem]"
+                >
+                  {"\u2713"}
+                </span>
                 Copied!
               </p>
             ) : null}
 
             {copyStatus === "error" ? (
-              <p className="mt-3 text-sm text-foreground/65">
+              <p className="mt-3 text-sm text-muted">
                 Couldn&apos;t copy automatically — select the text above and copy manually.
               </p>
             ) : null}
 
             <div className="mt-4 flex flex-col gap-2">
-              <button
-                className="min-h-11 bg-foreground px-4 text-sm font-medium text-background"
+              <Button
+                className="w-full"
                 type="button"
                 onClick={handleCopyExport}
               >
                 Copy to clipboard
-              </button>
+              </Button>
 
               {copyStatus === "copied" ? (
-                <div className="rounded-lg border border-foreground/10 p-3">
+                <div
+                  className="rounded-control border border-border bg-surface p-3 shadow-field"
+                  style={{ borderRadius: "var(--radius-control)" }}
+                >
                   <p className="text-sm font-medium">
                     Archive these {selectedReadyExpenses.length}{" "}
                     {selectedReadyExpenses.length === 1
@@ -660,21 +678,22 @@ export default function InboxPage() {
                     ?
                   </p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button
-                      className="min-h-10 bg-foreground px-3 text-sm font-medium text-background disabled:opacity-60"
+                    <Button
+                      className="min-h-10 px-3 text-sm"
                       disabled={isArchiving}
                       type="button"
                       onClick={handleArchiveExported}
                     >
                       {isArchiving ? "Archiving..." : "Archive"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       className="min-h-10 px-3 text-sm"
+                      variant="secondary"
                       type="button"
                       onClick={handleKeepExported}
                     >
                       Keep
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : null}
