@@ -6,8 +6,8 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Log Now",
     display: "standalone",
     start_url: "/",
-    background_color: "#0b0f14",
-    theme_color: "#0b0f14",
+    background_color: "#f5f1e8",
+    theme_color: "#f5f1e8",
     orientation: "portrait",
     icons: [
       {

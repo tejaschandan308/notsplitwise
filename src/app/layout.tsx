@@ -24,7 +24,8 @@ const themeScript = `
 
 export const metadata: Metadata = {
   title: "Log Now. Split Later.",
-  description: "Log expenses now and split them later.",
+  description:
+    "Capture trip expenses in seconds, review them later, and copy a reference for manual entry in Splitwise.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -38,8 +39,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fafafd" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0b" },
+    { media: "(prefers-color-scheme: light)", color: "#f5f1e8" },
+    { media: "(prefers-color-scheme: dark)", color: "#15140f" },
   ],
 };
 

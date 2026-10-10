@@ -1,57 +1,124 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { listTrips, setActiveTrip } from "@/lib/storage";
-import type { Trip } from "@/lib/types";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { selectClasses } from "@/components/field";
+import { currencyNames } from "@/lib/currency";
+import { useLiveQuery, useOnline } from "@/lib/hooks";
+import {
+  getActiveTrip,
+  listExpenses,
+  listTrips,
+  setActiveTrip,
+  setTripCurrency,
+} from "@/lib/storage";
+import { CURRENCY_CODES, type CurrencyCode, type Trip } from "@/lib/types";
 
-type TopBarProps = {
-  tripName: string;
-  backHref?: string;
-  isAddMemberOpen?: boolean;
-  onAddMemberClick?: () => void;
-};
+/** Active trip, kept live so switching trips updates every screen. */
+export function useActiveTrip() {
+  return useLiveQuery(() => getActiveTrip(), []);
+}
+
+export function useDraftCount(): number {
+  const { data } = useLiveQuery(async () => {
+    const trip = await getActiveTrip();
+
+    return trip ? (await listExpenses(trip.id, "draft")).length : 0;
+  }, []);
+
+  return data ?? 0;
+}
 
 type Theme = "light" | "dark";
+
+function subscribeTheme(callback: () => void): () => void {
+  const observer = new MutationObserver(callback);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+
+  return () => observer.disconnect();
+}
 
 function readTheme(): Theme {
   return document.documentElement.classList.contains("dark") ? "dark" : "light";
 }
 
-export function TopBar({
-  tripName,
-  backHref,
-  isAddMemberOpen = false,
-  onAddMemberClick,
-}: TopBarProps) {
+function ThemeToggle() {
+  const theme = useSyncExternalStore(subscribeTheme, readTheme, () => "light");
+  const next: Theme = theme === "dark" ? "light" : "dark";
+
+  function toggle(): void {
+    const root = document.documentElement;
+
+    root.classList.remove("light", "dark");
+    root.classList.add(next);
+
+    try {
+      window.localStorage.setItem("log-now:theme", next);
+    } catch {
+      // Theme still applies for this visit.
+    }
+  }
+
+  return (
+    <button
+      aria-label={`Switch to ${next} theme`}
+      className="flex size-11 items-center justify-center rounded-control text-ink-2 transition-colors hover:bg-sunken hover:text-ink"
+      title={`Switch to ${next} theme`}
+      type="button"
+      onClick={toggle}
+    >
+      <svg aria-hidden="true" className="size-[1.15rem]" fill="none" viewBox="0 0 20 20">
+        <circle cx="10" cy="10" r="7.25" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M10 2.75a7.25 7.25 0 0 1 0 14.5z" fill="currentColor" />
+      </svg>
+    </button>
+  );
+}
+
+function TripSwitcher({ trip }: { trip: Trip | undefined }) {
   const router = useRouter();
-  const tripMenuRef = useRef<HTMLDivElement>(null);
-  const tripTriggerRef = useRef<HTMLButtonElement>(null);
-  const [isTripMenuOpen, setIsTripMenuOpen] = useState(false);
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [isLoadingTrips, setIsLoadingTrips] = useState(false);
-  const [tripMenuMessage, setTripMenuMessage] = useState("");
-  const [switchingTripId, setSwitchingTripId] = useState<string | null>(null);
+  const panelId = useId();
+  const currencyId = useId();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const { data: trips } = useLiveQuery(() => listTrips(), []);
 
   useEffect(() => {
-    if (!isTripMenuOpen) {
+    if (!open) {
       return;
     }
 
+    const panel = panelRef.current;
+    (
+      panel?.querySelector<HTMLElement>('[aria-current="true"]') ??
+      panel?.querySelector<HTMLElement>("button, a, select")
+    )?.focus();
+
     function handlePointerDown(event: PointerEvent): void {
-      if (
-        tripMenuRef.current &&
-        !tripMenuRef.current.contains(event.target as Node)
-      ) {
-        setIsTripMenuOpen(false);
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
       }
     }
 
     function handleKeyDown(event: KeyboardEvent): void {
       if (event.key === "Escape") {
-        setIsTripMenuOpen(false);
-        tripTriggerRef.current?.focus();
+        setOpen(false);
+        triggerRef.current?.focus();
       }
     }
 
@@ -62,226 +129,261 @@ export function TopBar({
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isTripMenuOpen]);
+  }, [open]);
 
-  function toggleTheme(): void {
-    const nextTheme: Theme = readTheme() === "dark" ? "light" : "dark";
-    const root = document.documentElement;
-
-    root.classList.remove("light", "dark");
-    root.classList.add(nextTheme);
-    window.localStorage.setItem("log-now:theme", nextTheme);
-  }
-
-  async function toggleTripMenu(): Promise<void> {
-    if (isTripMenuOpen) {
-      setIsTripMenuOpen(false);
+  function moveFocus(event: ReactKeyboardEvent<HTMLDivElement>): void {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
       return;
     }
 
-    setIsTripMenuOpen(true);
-    setIsLoadingTrips(true);
-    setTripMenuMessage("");
-
-    try {
-      setTrips(await listTrips());
-    } catch {
-      setTripMenuMessage("Could not load trips.");
-    } finally {
-      setIsLoadingTrips(false);
-    }
-  }
-
-  async function handleTripSelect(trip: Trip): Promise<void> {
-    setIsTripMenuOpen(false);
-
-    if (trip.isActive) {
+    if ((event.target as HTMLElement).tagName === "SELECT") {
       return;
     }
 
-    setSwitchingTripId(trip.id);
+    const items = [
+      ...(panelRef.current?.querySelectorAll<HTMLElement>("[data-trip-item]") ?? []),
+    ];
+    const index = items.indexOf(document.activeElement as HTMLElement);
+    const delta = event.key === "ArrowDown" ? 1 : -1;
+
+    event.preventDefault();
+    items[(index + delta + items.length) % items.length]?.focus();
+  }
+
+  async function switchTo(target: Trip): Promise<void> {
+    if (target.isActive) {
+      setOpen(false);
+      triggerRef.current?.focus();
+      return;
+    }
 
     try {
-      await setActiveTrip(trip.id);
-      window.location.assign("/capture");
+      await setActiveTrip(target.id);
+      setOpen(false);
+      setMessage("");
+      router.push("/capture");
     } catch {
-      setSwitchingTripId(null);
-      setTripMenuMessage("Could not switch trips.");
-      setIsTripMenuOpen(true);
+      setMessage("Couldn’t switch trips. Try again.");
     }
   }
 
-  function handleNewTrip(): void {
-    setIsTripMenuOpen(false);
-    router.push("/trip/new");
+  async function changeCurrency(currency: CurrencyCode): Promise<void> {
+    if (!trip) return;
+
+    try {
+      await setTripCurrency(trip.id, currency);
+      setMessage(`New captures will use ${currency}. Saved expenses keep theirs.`);
+    } catch {
+      setMessage("Couldn’t save the currency. Try again.");
+    }
   }
 
   return (
-    <header className="flex min-h-12 items-center justify-between gap-4">
-      {backHref ? (
-        <Link
-          className="flex min-h-11 min-w-0 items-center gap-3 rounded-control px-1 text-[0.8125rem] font-medium text-muted outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
-          href={backHref}
-          style={{ borderRadius: "var(--radius-control)" }}
+    <div ref={containerRef} className="relative -ml-2 min-w-0">
+      <button
+        ref={triggerRef}
+        aria-controls={panelId}
+        aria-expanded={open}
+        className="group flex min-h-11 max-w-full min-w-0 items-center gap-2 rounded-control px-2 text-left transition-colors hover:bg-sunken"
+        type="button"
+        onClick={() => {
+          setMessage("");
+          setOpen((value) => !value);
+        }}
+      >
+        <span className="min-w-0">
+          <span className="block text-[0.6875rem] font-semibold tracking-[0.08em] text-ink-3 uppercase">
+            Trip
+          </span>
+          <span className="block truncate text-base leading-tight font-semibold text-ink">
+            {trip?.name ?? "…"}
+          </span>
+        </span>
+        <svg
+          aria-hidden="true"
+          className={`mt-3 size-3 shrink-0 text-ink-2 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 12 8"
         >
-          <span
-            aria-hidden="true"
-            className="size-2.5 rotate-45 border-b border-l border-current"
-          />
-          <span className="truncate">{tripName}</span>
-        </Link>
-      ) : (
-        <div ref={tripMenuRef} className="relative min-w-0">
-          <button
-            ref={tripTriggerRef}
-            aria-controls="trip-switcher-menu"
-            aria-expanded={isTripMenuOpen}
-            aria-haspopup="menu"
-            className="group flex min-h-11 min-w-0 items-center gap-2 rounded-control border-0 bg-transparent px-1 text-left text-[1.125rem] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus"
-            style={{
-              border: 0,
-              borderRadius: "var(--radius-control)",
-            }}
-            type="button"
-            onClick={() => void toggleTripMenu()}
-          >
-            <span className="truncate">{tripName}</span>
-            <span
-              aria-hidden="true"
-              className={`size-2.5 rotate-45 border-b border-r border-muted transition-transform ${
-                isTripMenuOpen
-                  ? "-translate-y-0.5 rotate-[225deg]"
-                  : "group-hover:translate-y-0.5"
-              }`}
-            />
-          </button>
+          <path d="M1 1.5l5 5 5-5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
+        </svg>
+        <span className="sr-only">, switch trip</span>
+      </button>
 
-          {isTripMenuOpen ? (
-            <div
-              id="trip-switcher-menu"
-              className="absolute top-full left-0 z-40 mt-2 w-[min(20rem,calc(100vw-2.5rem))] min-w-64 overflow-hidden rounded-control border border-border bg-surface shadow-field"
-              role="menu"
-              aria-label="Switch trip"
-              style={{ borderRadius: "var(--radius-control)" }}
-            >
-              <div className="max-h-72 overflow-y-auto p-1.5">
-                {isLoadingTrips ? (
-                  <p className="px-3 py-3 text-[0.8125rem] text-muted">
-                    Loading trips...
-                  </p>
-                ) : null}
-
-                {!isLoadingTrips
-                  ? trips.map((trip) => (
-                      <button
-                        key={trip.id}
-                        aria-current={trip.isActive ? "true" : undefined}
-                        className="flex min-h-14 w-full items-center justify-between gap-4 border-0 bg-transparent px-3 py-2 text-left outline-none transition-colors hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait"
-                        disabled={switchingTripId !== null}
-                        role="menuitem"
-                        style={{
-                          border: 0,
-                          borderRadius: "var(--radius-control)",
-                        }}
-                        type="button"
-                        onClick={() => void handleTripSelect(trip)}
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate text-[0.9375rem] font-medium text-foreground">
-                            {trip.name}
-                          </span>
-                          <span className="mt-0.5 block text-[0.75rem] text-muted">
-                            {trip.members.length}{" "}
-                            {trip.members.length === 1 ? "member" : "members"}
-                          </span>
-                        </span>
-                        {trip.isActive ? (
-                          <span
-                            aria-label="Active trip"
-                            className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-[0.75rem] font-semibold text-accent-contrast"
-                          >
-                            {"\u2713"}
-                          </span>
-                        ) : null}
-                      </button>
-                    ))
-                  : null}
-
-                {tripMenuMessage ? (
-                  <p className="px-3 py-2 text-[0.8125rem] text-muted">
-                    {tripMenuMessage}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="border-t border-border p-1.5">
+      {open ? (
+        <div
+          ref={panelRef}
+          aria-label="Trips"
+          className="rise-in absolute top-full left-0 z-40 mt-1.5 w-[min(21rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-rule bg-surface shadow-raised"
+          id={panelId}
+          role="region"
+          onKeyDown={moveFocus}
+        >
+          <ul className="max-h-72 overflow-y-auto p-1.5">
+            {(trips ?? []).map((item) => (
+              <li key={item.id}>
                 <button
-                  className="flex min-h-11 w-full items-center gap-2 border-0 bg-transparent px-3 text-left text-[0.875rem] font-medium text-foreground outline-none transition-colors hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-focus"
-                  role="menuitem"
-                  style={{
-                    border: 0,
-                    borderRadius: "var(--radius-control)",
-                  }}
+                  aria-current={item.isActive ? "true" : undefined}
+                  className="flex min-h-12 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-sunken"
+                  data-trip-item
                   type="button"
-                  onClick={handleNewTrip}
+                  onClick={() => void switchTo(item)}
                 >
-                  <span aria-hidden="true" className="text-muted">
-                    +
+                  <span className="min-w-0">
+                    <span className="block truncate text-[0.9375rem] font-medium text-ink">
+                      {item.name}
+                    </span>
+                    <span className="block text-xs text-ink-3">
+                      {item.members.length} people · {item.currency}
+                    </span>
                   </span>
-                  New trip
+                  {item.isActive ? (
+                    <span className="text-xs font-semibold text-accent">Current</span>
+                  ) : null}
                 </button>
-              </div>
+              </li>
+            ))}
+          </ul>
+
+          {trip ? (
+            <div className="border-t border-rule px-3 py-3">
+              <label className="mb-1 block text-xs font-semibold text-ink-2" htmlFor={currencyId}>
+                Default currency for {trip.name}
+              </label>
+              <select
+                className={`${selectClasses} min-h-11 text-sm`}
+                id={currencyId}
+                value={trip.currency}
+                onChange={(event) =>
+                  void changeCurrency(event.target.value as CurrencyCode)
+                }
+              >
+                {CURRENCY_CODES.map((code) => (
+                  <option key={code} value={code}>
+                    {code} · {currencyNames[code]}
+                  </option>
+                ))}
+              </select>
             </div>
           ) : null}
-        </div>
-      )}
 
-      <div className="flex items-center">
-        {onAddMemberClick ? (
-          <button
-            aria-expanded={isAddMemberOpen}
-            aria-label="Add trip member"
-            className="flex size-11 items-center justify-center rounded-control border-0 bg-transparent text-foreground outline-none transition-colors hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-focus"
-            style={{ borderRadius: "var(--radius-control)" }}
-            title="Add trip member"
-            type="button"
-            onClick={onAddMemberClick}
-          >
-            <svg
-              aria-hidden="true"
-              className="size-5"
-              fill="none"
-              viewBox="0 0 24 24"
+          {message ? (
+            <p aria-live="polite" className="px-4 pb-2 text-xs text-ink-2">
+              {message}
+            </p>
+          ) : null}
+
+          <div className="border-t border-rule p-1.5">
+            <Link
+              className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-ink hover:bg-sunken"
+              data-trip-item
+              href="/trip/new"
+              onClick={() => setOpen(false)}
             >
-              <path
-                d="M14.5 19.5v-1.25a4.25 4.25 0 0 0-4.25-4.25H6.5a4.25 4.25 0 0 0-4.25 4.25v1.25M8.38 10a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5ZM18.5 7v6M15.5 10h6"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.8"
-              />
-            </svg>
-          </button>
-        ) : null}
+              <span aria-hidden="true" className="text-ink-3">+</span>
+              New trip
+            </Link>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
-        {onAddMemberClick ? (
-          <span aria-hidden="true" className="mx-1 h-7 w-px bg-border" />
-        ) : null}
+function DesktopNav() {
+  const pathname = usePathname();
+  const draftCount = useDraftCount();
 
-        <button
-          aria-label="Toggle color theme"
-          className="flex size-11 items-center justify-center rounded-full border border-border bg-surface text-foreground outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-focus"
-          title="Toggle color theme"
-          type="button"
-          onClick={toggleTheme}
-        >
-          <span
-            aria-hidden="true"
-            className="relative size-5 overflow-hidden rounded-full border border-current"
+  return (
+    <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
+      {[
+        { href: "/capture", label: "Capture" },
+        { href: "/inbox", label: "Inbox" },
+      ].map((item) => {
+        const active = pathname === item.href;
+
+        return (
+          <Link
+            key={item.href}
+            aria-current={active ? "page" : undefined}
+            className={`flex min-h-11 items-center gap-2 rounded-control px-3.5 text-sm font-semibold transition-colors ${
+              active ? "bg-ink text-paper" : "text-ink-2 hover:bg-sunken hover:text-ink"
+            }`}
+            href={item.href}
           >
-            <span className="absolute inset-y-0 right-0 w-1/2 bg-current" />
-          </span>
-        </button>
+            {item.label}
+            {item.href === "/inbox" && draftCount > 0 ? (
+              <span className="text-xs tabular-nums opacity-80">
+                {draftCount}
+                <span className="sr-only"> drafts</span>
+              </span>
+            ) : null}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function OfflineIndicator() {
+  const online = useOnline();
+
+  if (online) {
+    return null;
+  }
+
+  return (
+    <span
+      className="inline-flex h-7 items-center gap-1.5 rounded-full border border-rule-strong px-2.5 text-xs font-semibold text-ink-2"
+      role="status"
+    >
+      <span aria-hidden="true" className="size-1.5 rounded-full border border-ink-2" />
+      Offline
+      <span className="sr-only">. Captures are saved on this device.</span>
+    </span>
+  );
+}
+
+type TopBarProps = {
+  /**
+   * Replaces the trip switcher with a back link (e.g. on Review).
+   * `onNavigate` can cancel the navigation with `event.preventDefault()`.
+   */
+  back?: {
+    href: string;
+    label: string;
+    onNavigate?: (event: { preventDefault: () => void }) => void;
+  };
+  /** Extra controls, shown before the theme toggle. */
+  actions?: ReactNode;
+};
+
+export function TopBar({ back, actions }: TopBarProps) {
+  const { data: trip } = useActiveTrip();
+
+  return (
+    <header className="mb-5 flex min-h-14 items-center justify-between gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
+        {back ? (
+          <Link
+            className="-ml-2 flex min-h-11 items-center gap-2 rounded-control px-2 text-sm font-semibold text-ink-2 transition-colors hover:bg-sunken hover:text-ink"
+            href={back.href}
+            onNavigate={back.onNavigate}
+          >
+            <svg aria-hidden="true" className="size-3" fill="none" viewBox="0 0 8 12">
+              <path d="M6.5 1l-5 5 5 5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
+            </svg>
+            {back.label}
+          </Link>
+        ) : (
+          <TripSwitcher trip={trip ?? undefined} />
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <OfflineIndicator />
+        <DesktopNav />
+        {actions}
+        <ThemeToggle />
       </div>
     </header>
   );

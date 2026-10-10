@@ -1,6 +1,7 @@
-import type { Category, Expense } from "@/lib/types";
+import { formatMoney, isValidAmount } from "@/lib/currency";
+import type { Category, CurrencyCode, Expense } from "@/lib/types";
 
-const categoryLabels: Record<Category, string> = {
+export const categoryLabels: Record<Category, string> = {
   food: "Food",
   transport: "Transport",
   stay: "Stay",
@@ -9,53 +10,104 @@ const categoryLabels: Record<Category, string> = {
   other: "Other",
 };
 
-function formatAmount(amount: number): string {
-  if (Number.isInteger(amount)) {
-    return amount.toString();
-  }
-
-  return amount.toFixed(2).replace(/\.?0+$/, "");
+export function describeExpense(expense: Expense): string {
+  return (
+    expense.note.trim() ||
+    expense.location?.trim() ||
+    expense.rawText.trim() ||
+    "Expense"
+  );
 }
 
-function getDescription(expense: Expense): string {
-  if (expense.note.trim()) {
-    return expense.note.trim();
+export function payerText(expense: Expense): string {
+  if (!expense.paidBy) {
+    return "payer not set";
   }
 
-  if (expense.location?.trim()) {
-    return expense.location.trim();
+  if (expense.paidBySource === "legacy") {
+    return `paid by ${expense.paidBy} (assumed; saved before payer tracking)`;
   }
 
-  return "Expense";
+  return `paid by ${expense.paidBy}`;
 }
 
-function getSplitText(expense: Expense): string {
+export function splitText(expense: Expense): string {
   if (expense.isPersonal) {
-    return "Personal (not shared)";
+    return expense.paidBy && expense.paidBy !== "Me"
+      ? `For Me only: I owe ${expense.paidBy} the full amount`
+      : "Personal, not shared (nothing to enter)";
   }
 
   const names = expense.included.join(", ");
+  const count = expense.included.length;
 
   if (expense.splitType === "custom") {
-    return `Split custom: ${names} (enter amounts in Splitwise)`;
+    return `Custom split, shares not calculated here; enter them in Splitwise. Between: ${names}`;
   }
 
-  return `Split equally: ${names}`;
+  return `Split equally between ${count} ${count === 1 ? "person" : "people"}: ${names}`;
 }
 
-export function buildExportText(
-  tripName: string,
+function shortDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+/** Per-currency totals of valid amounts. Currencies are never mixed. */
+export function totalsByCurrency(
   expenses: Expense[],
-): string {
-  const lines = [...expenses]
-    .sort((a, b) => a.createdAt - b.createdAt)
-    .map((expense, index) => {
-      const categorySegment = expense.category
-        ? ` — ${categoryLabels[expense.category]}`
-        : "";
+): Array<{ currency: CurrencyCode; total: number }> {
+  const totals = new Map<CurrencyCode, number>();
 
-      return `${index + 1}. ₹${formatAmount(expense.amount ?? 0)} — ${getDescription(expense)}${categorySegment} — ${getSplitText(expense)}`;
-    });
+  for (const expense of expenses) {
+    if (expense.isPersonal && (!expense.paidBy || expense.paidBy === "Me")) {
+      continue;
+    }
 
-  return `${tripName} — Ready to add to Splitwise\n\n${lines.join("\n")}`;
+    if (expense.currency && isValidAmount(expense.amount)) {
+      totals.set(
+        expense.currency,
+        Math.round(((totals.get(expense.currency) ?? 0) + expense.amount) * 100) /
+          100,
+      );
+    }
+  }
+
+  return [...totals.entries()].map(([currency, total]) => ({
+    currency,
+    total,
+  }));
+}
+
+export function buildExportText(tripName: string, expenses: Expense[]): string {
+  const sorted = [...expenses].sort((a, b) => a.createdAt - b.createdAt);
+  const blocks = sorted.map((expense, index) => {
+    const category = expense.category
+      ? ` (${categoryLabels[expense.category]})`
+      : "";
+
+    return [
+      `${index + 1}. ${describeExpense(expense)}${category}, ${shortDate(expense.createdAt)}`,
+      `   ${formatMoney(expense.amount, expense.currency)}, ${payerText(expense)}`,
+      `   ${splitText(expense)}`,
+    ].join("\n");
+  });
+  const totals = totalsByCurrency(sorted);
+  const totalLine =
+    totals.length > 0
+      ? `\n\nShared totals by currency (not converted): ${totals
+          .map(({ currency, total }) => formatMoney(total, currency))
+          .join(" · ")}`
+      : "";
+
+  return [
+    `${tripName}: expenses to enter in Splitwise`,
+    "Reference for manual entry. Nothing here is sent to Splitwise.",
+    "",
+    blocks.join("\n\n"),
+  ]
+    .join("\n")
+    .concat(totalLine);
 }

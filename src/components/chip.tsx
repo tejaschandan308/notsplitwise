@@ -5,22 +5,16 @@ type ChipProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   selected: boolean;
 };
 
-export function Chip({
-  className = "",
-  label,
-  selected,
-  style,
-  ...props
-}: ChipProps) {
+/** Single-choice option (category, split). Selected = ink, not accent. */
+export function Chip({ className = "", label, selected, ...props }: ChipProps) {
   return (
     <button
       aria-pressed={selected}
-      className={`inline-flex min-h-11 items-center justify-center rounded-pill border px-4 text-[0.875rem] font-semibold outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+      className={`inline-flex min-h-11 items-center justify-center rounded-full border px-4 text-sm font-medium transition-colors duration-150 ${
         selected
-          ? "border-accent bg-accent text-accent-contrast"
-          : "border-border-strong bg-transparent text-foreground hover:border-accent"
+          ? "border-ink bg-ink text-paper"
+          : "border-rule-strong bg-transparent text-ink hover:border-field-border hover:bg-sunken"
       } ${className}`}
-      style={{ borderRadius: "var(--radius-pill)", ...style }}
       type="button"
       {...props}
     >

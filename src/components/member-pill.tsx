@@ -1,53 +1,40 @@
 import type { ButtonHTMLAttributes } from "react";
 
-export type MemberPillState = "unset" | "selected" | "unselected";
-
 type MemberPillProps = Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "children"
 > & {
   name: string;
-  state: MemberPillState;
+  selected: boolean;
 };
 
-const stateClasses: Record<MemberPillState, string> = {
-  unset:
-    "border-border bg-transparent text-muted hover:border-border-strong hover:text-foreground",
-  selected:
-    "border-accent bg-accent text-accent-contrast font-semibold shadow-pill",
-  unselected:
-    "border-border-strong bg-transparent text-foreground hover:border-accent",
-};
-
+/** Toggle for a person. Selected has a fill and a check, not colour alone. */
 export function MemberPill({
   className = "",
   name,
-  state,
-  style,
+  selected,
   ...props
 }: MemberPillProps) {
-  const isSelected = state === "selected";
-
   return (
     <button
-      aria-pressed={state === "unset" ? undefined : isSelected}
-      className={`inline-flex min-h-11 items-center gap-2 rounded-pill border px-4 text-[0.9375rem] font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background ${stateClasses[state]} ${className}`}
-      style={{ borderRadius: "var(--radius-pill)", ...style }}
+      aria-pressed={selected}
+      className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border pr-4 pl-3 text-[0.9375rem] font-medium transition-colors duration-150 ${
+        selected
+          ? "border-ink bg-ink text-paper"
+          : "border-rule-strong bg-transparent text-ink-2 hover:border-field-border hover:text-ink"
+      } ${className}`}
       type="button"
       {...props}
     >
-      {name === "Me" ? (
-        <span
-          aria-hidden="true"
-          className="size-2 rounded-full bg-current"
-        />
-      ) : null}
-      {isSelected ? (
-        <span aria-hidden="true" className="text-sm leading-none">
-          {"\u2713"}
-        </span>
-      ) : null}
-      <span>{name}</span>
+      <span
+        aria-hidden="true"
+        className={`flex size-4 items-center justify-center rounded-full border text-[0.625rem] leading-none ${
+          selected ? "border-paper bg-paper text-ink" : "border-rule-strong"
+        }`}
+      >
+        {selected ? "✓" : ""}
+      </span>
+      <span>{name === "Me" ? "Me" : name}</span>
     </button>
   );
 }
